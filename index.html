@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Fotos da Obra — Serena Essence</title>
+<style>
+  :root{
+    --bg:#f4f4f2; --card:#ffffff; --ink:#1c1c1c; --sub:#6b6b6b;
+    --accent:#b23b2e; --accent-dark:#8f2e23; --ok:#2e7d4f; --line:#e3e0da;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px;}
+  header{background:var(--accent);color:#fff;padding:14px 16px 10px;}
+  header h1{font-size:17px;margin:0 0 2px;}
+  header p{font-size:12px;margin:0;opacity:.9;}
+  .tabs{display:flex;gap:8px;padding:10px 12px 0;}
+  .tab{flex:1;padding:10px 0;border:none;border-radius:8px 8px 0 0;background:#e8e5df;color:#555;font-size:14px;font-weight:600;}
+  .tab.active{background:var(--card);color:var(--accent-dark);}
+  .quem-row{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--card);font-size:13px;border-bottom:1px solid var(--line);}
+  .quem-row select{flex:1;padding:8px;border-radius:6px;border:1px solid var(--line);font-size:14px;}
+  .progresso{padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line);font-size:13px;color:var(--sub);}
+  .progresso b{color:var(--ink);}
+  .barra{height:6px;background:var(--line);border-radius:4px;margin-top:6px;overflow:hidden;}
+  .barra > div{height:100%;background:var(--ok);}
+  #listaAmbientes{padding:10px 10px 0;}
+  .ambiente-card{background:var(--card);border-radius:10px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.06);overflow:hidden;}
+  .ambiente-header{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;cursor:pointer;}
+  .ambiente-header .nome{font-size:15px;font-weight:600;}
+  .ambiente-header .badge{font-size:12px;color:#fff;background:var(--sub);padding:3px 8px;border-radius:10px;margin-left:8px;}
+  .ambiente-header .badge.completo{background:var(--ok);}
+  .chevron{font-size:14px;color:var(--sub);margin-left:8px;transition:transform .15s;}
+  .ambiente-card.aberto .chevron{transform:rotate(180deg);}
+  .ambiente-body{display:none;padding:0 14px 14px;border-top:1px solid var(--line);}
+  .ambiente-card.aberto .ambiente-body{display:block;}
+  .parede-row{padding:10px 0;border-bottom:1px dashed var(--line);}
+  .parede-row:last-of-type{border-bottom:none;}
+  .parede-titulo{font-size:13px;font-weight:600;color:var(--sub);margin-bottom:6px;}
+  .fotos-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .foto-thumb{position:relative;width:74px;height:74px;border-radius:8px;overflow:hidden;background:#eee;}
+  .foto-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .foto-thumb .mini-btns{position:absolute;bottom:0;left:0;right:0;display:flex;background:rgba(0,0,0,.55);}
+  .foto-thumb .mini-btns button{flex:1;border:none;background:transparent;color:#fff;font-size:13px;padding:3px 0;}
+  .btn-add-foto{width:74px;height:74px;border-radius:8px;border:2px dashed #c9c5bc;background:transparent;color:var(--sub);font-size:12px;}
+  .btn-add-parede{margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1px dashed var(--sub);background:transparent;color:var(--sub);font-size:13px;}
+  .rodape-acoes{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;padding:8px 10px;}
+  .rodape-acoes button{flex:1;padding:11px 0;border-radius:8px;border:1px solid var(--line);background:#fafaf8;font-size:13px;font-weight:600;color:var(--ink);}
+  .rodape-acoes button.primario{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .regra-box{margin:0 10px 10px;padding:10px 12px;background:#fff8ec;border:1px solid #eadfc0;border-radius:8px;font-size:12px;line-height:1.5;color:#5a4a20;}
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;}
+  .lightbox.aberto{display:flex;}
+  .lightbox img{max-width:92vw;max-height:78vh;border-radius:6px;}
+  .lightbox .lb-info{color:#fff;font-size:12px;margin-top:10px;text-align:center;}
+  .lightbox .lb-fechar{position:absolute;top:14px;right:16px;color:#fff;font-size:26px;background:none;border:none;}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Fotos da Obra — Serena Essence</h1>
+  <p>Geminado Czerniewicz · 1 Casa · registro por ambiente e parede</p>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div class="quem-row">
+  Quem está fotografando:
+  <select id="quemSelect">
+    <option>Felype</option>
+    <option>Fabiane</option>
+    <option>Estagiário</option>
+    <option>Outro</option>
+  </select>
+</div>
+<div class="progresso" id="progresso"></div>
+<div class="regra-box">
+  <b>Regra da parede:</b> Parede 1 = a que tem a porta principal do ambiente. Sentido horário a partir dela: 2, 3, 4. Faltando parede pro ambiente? Usa "+ Adicionar parede".
+</div>
+
+<div id="listaAmbientes"></div>
+
+<div class="rodape-acoes">
+  <button id="btnExportar">⬇ Exportar backup</button>
+  <button id="btnImportar">⬆ Importar backup</button>
+</div>
+<input type="file" id="inputImportar" accept="application/json" hidden>
+<input type="file" id="inputFoto" accept="image/*" capture="environment" hidden>
+
+<div class="lightbox" id="lightbox">
+  <button class="lb-fechar" id="lbFechar">×</button>
+  <img id="lbImg">
+  <div class="lb-info" id="lbInfo"></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Dados reais do Serena Essence (extraídos da planta) ----------
+  const ANDARES = {
+    terreo: { nome: "Térreo", ambientes: [
+      {id:"jardim_fundos", nome:"Jardim (fundos)"},
+      {id:"calcada_fundos", nome:"Calçada Fundos — 6,20 m²"},
+      {id:"lavanderia", nome:"Lavanderia — 3,41 m²"},
+      {id:"escada_terreo", nome:"Escada"},
+      {id:"area_social", nome:"Área Social — 48,01 m²"},
+      {id:"lavabo", nome:"Lavabo — 1,98 m²"},
+      {id:"calcada_frente", nome:"Calçada Frente — 8,16 m²"},
+      {id:"jardim_frente", nome:"Jardim / acesso (frente)"},
+    ]},
+    pav2: { nome: "2° Pavimento", ambientes: [
+      {id:"suite1", nome:"Suíte 1 — 10,19 m²"},
+      {id:"bwc1", nome:"BWC 1 (ensuíte Suíte 1)"},
+      {id:"escada_2pav", nome:"Escada"},
+      {id:"bwc2", nome:"BWC 2 (ensuíte Suíte Principal)"},
+      {id:"circulacao", nome:"Circulação"},
+      {id:"suite_principal", nome:"Suíte Principal — 15,63 m²"},
+      {id:"suite3", nome:"Suíte 3 — 9,17 m²"},
+      {id:"bwc3", nome:"BWC 3 (ensuíte Suíte 3)"},
+      {id:"varanda", nome:"Varanda — 5,45 m²"},
+    ]}
+  };
+  const PAREDES_PADRAO = 4;
+
+  // ---------- IndexedDB (guarda o BLOB da foto — localStorage só guarda estrutura) ----------
+  const DB_NAME = "obraFotosDB", STORE = "fotos";
+  function idbOpen(){
+    return new Promise((resolve,reject)=>{
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbPut(id, blob){
+    const db = await idbOpen();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(STORE,"readwrite");
+      tx.objectStore(STORE).put(blob, id);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbGet(id){
+    const db = await idbOpen();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(STORE,"readonly");
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbDelete(id){
+    const db = await idbOpen();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(STORE,"readwrite");
+      tx.objectStore(STORE).delete(id);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // ---------- Compressão de imagem (evita estourar espaço) ----------
+  function compressImage(file, maxDim, quality){
+    maxDim = maxDim || 1280; quality = quality || 0.72;
+    return new Promise((resolve, reject)=>{
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        let {width, height} = img;
+        if (width > height && width > maxDim){ height = Math.round(height*maxDim/width); width = maxDim; }
+        else if (height > maxDim){ width = Math.round(width*maxDim/height); height = maxDim; }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", quality);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("falha ao abrir imagem")); };
+      img.src = url;
+    });
+  }
+  function blobToDataURL(blob){
+    return new Promise((resolve,reject)=>{
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
+  function dataURLToBlob(dataURL){
+    const parts = dataURL.split(",");
+    const mime = parts[0].match(/:(.*?);/)[1];
+    const bin = atob(parts[1]);
+    const arr = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], {type:mime});
+  }
+
+  // ---------- Estado (estrutura leve: localStorage. Fotos: IndexedDB) ----------
+  const LS_KEY = "obraFotosEstado_serenaEssence";
+  function novoEstado(){
+    const st = { andares:{} };
+    for (const andarId in ANDARES){
+      st.andares[andarId] = { ambientes:{} };
+      for (const amb of ANDARES[andarId].ambientes){
+        const paredes = {};
+        for (let n=1;n<=PAREDES_PADRAO;n++) paredes[n] = { fotos:[] };
+        st.andares[andarId].ambientes[amb.id] = { numParedes: PAREDES_PADRAO, paredes };
+      }
+    }
+    return st;
+  }
+  function carregarEstado(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return novoEstado();
+      const st = JSON.parse(raw);
+      // garante que ambientes/paredes novos do código entrem mesmo em estado salvo antigo
+      for (const andarId in ANDARES){
+        if (!st.andares[andarId]) st.andares[andarId] = { ambientes:{} };
+        for (const amb of ANDARES[andarId].ambientes){
+          if (!st.andares[andarId].ambientes[amb.id]){
+            const paredes = {};
+            for (let n=1;n<=PAREDES_PADRAO;n++) paredes[n] = { fotos:[] };
+            st.andares[andarId].ambientes[amb.id] = { numParedes: PAREDES_PADRAO, paredes };
+          }
+        }
+      }
+      return st;
+    }catch(e){ console.error("estado corrompido, recomecando", e); return novoEstado(); }
+  }
+  function salvarEstado(){ localStorage.setItem(LS_KEY, JSON.stringify(estado)); }
+
+  let estado = carregarEstado();
+  let andarAtual = "terreo";
+  let abertos = {}; // ambienteId -> bool
+  const objectUrls = []; // p/ revogar depois
+
+  function novoId(quem){
+    return quem.replace(/\s+/g,"") + "_" + Date.now() + "_" + Math.random().toString(36).slice(2,8);
+  }
+  function toast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(()=>t.classList.remove("show"), 1600);
+  }
+
+  // ---------- Render ----------
+  function limparObjectUrls(){
+    while(objectUrls.length) URL.revokeObjectURL(objectUrls.pop());
+  }
+
+  function renderTabs(){
+    const tabs = document.getElementById("tabs");
+    tabs.innerHTML = "";
+    for (const andarId in ANDARES){
+      const b = document.createElement("button");
+      b.className = "tab" + (andarId===andarAtual ? " active" : "");
+      b.textContent = ANDARES[andarId].nome;
+      b.onclick = () => { andarAtual = andarId; renderTudo(); };
+      tabs.appendChild(b);
+    }
+  }
+
+  function contarProgresso(andarId){
+    const ambientes = ANDARES[andarId].ambientes;
+    let paredesTotal=0, paredesComFoto=0;
+    for (const amb of ambientes){
+      const a = estado.andares[andarId].ambientes[amb.id];
+      for (let n=1;n<=a.numParedes;n++){
+        paredesTotal++;
+        if (a.paredes[n] && a.paredes[n].fotos.length>0) paredesComFoto++;
+      }
+    }
+    return {paredesTotal, paredesComFoto};
+  }
+
+  function renderProgresso(){
+    const {paredesTotal, paredesComFoto} = contarProgresso(andarAtual);
+    const pct = paredesTotal ? Math.round(100*paredesComFoto/paredesTotal) : 0;
+    const el = document.getElementById("progresso");
+    el.innerHTML = `<b>${paredesComFoto} de ${paredesTotal}</b> paredes já têm foto neste andar (${pct}%)
+      <div class="barra"><div style="width:${pct}%"></div></div>`;
+  }
+
+  async function renderAmbientes(){
+    limparObjectUrls();
+    const lista = document.getElementById("listaAmbientes");
+    lista.innerHTML = "";
+    const ambientes = ANDARES[andarAtual].ambientes;
+    for (const amb of ambientes){
+      const a = estado.andares[andarAtual].ambientes[amb.id];
+      let comFoto=0;
+      for (let n=1;n<=a.numParedes;n++) if (a.paredes[n].fotos.length>0) comFoto++;
+      const card = document.createElement("div");
+      card.className = "ambiente-card" + (abertos[amb.id] ? " aberto" : "");
+      const completo = comFoto===a.numParedes;
+      card.innerHTML = `
+        <div class="ambiente-header" data-toggle="${amb.id}">
+          <span class="nome">${amb.nome}</span>
+          <span style="display:flex;align-items:center;">
+            <span class="badge ${completo?'completo':''}">${comFoto}/${a.numParedes}</span>
+            <span class="chevron">▾</span>
+          </span>
+        </div>
+        <div class="ambiente-body"></div>`;
+      lista.appendChild(card);
+      const body = card.querySelector(".ambiente-body");
+      for (let n=1;n<=a.numParedes;n++){
+        const row = document.createElement("div");
+        row.className = "parede-row";
+        row.innerHTML = `<div class="parede-titulo">Parede ${n}</div><div class="fotos-grid" data-grid="${amb.id}|${n}"></div>`;
+        body.appendChild(row);
+        const grid = row.querySelector(".fotos-grid");
+        for (const foto of a.paredes[n].fotos){
+          const thumb = document.createElement("div");
+          thumb.className = "foto-thumb";
+          const blob = await idbGet(foto.id);
+          if (blob){
+            const url = URL.createObjectURL(blob); objectUrls.push(url);
+            thumb.innerHTML = `<img src="${url}" data-view="${amb.id}|${n}|${foto.id}">
+              <div class="mini-btns">
+                <button data-retake="${amb.id}|${n}|${foto.id}">🔄</button>
+                <button data-del="${amb.id}|${n}|${foto.id}">🗑</button>
+              </div>`;
+          }
+          grid.appendChild(thumb);
+        }
+        const addBtn = document.createElement("button");
+        addBtn.className = "btn-add-foto";
+        addBtn.textContent = "+ Foto";
+        addBtn.setAttribute("data-add", amb.id + "|" + n);
+        grid.appendChild(addBtn);
+      }
+      const addParedeBtn = document.createElement("button");
+      addParedeBtn.className = "btn-add-parede";
+      addParedeBtn.textContent = "+ Adicionar parede";
+      addParedeBtn.setAttribute("data-add-parede", amb.id);
+      body.appendChild(addParedeBtn);
+    }
+  }
+
+  function renderTudo(){
+    renderTabs();
+    renderProgresso();
+    renderAmbientes();
+  }
+
+  // ---------- Ações ----------
+  let pendente = null; // {ambienteId, parede, replaceId}
+
+  document.getElementById("listaAmbientes").addEventListener("click", async (e)=>{
+    const t = e.target;
+    const toggleId = t.closest("[data-toggle]");
+    if (toggleId){
+      const id = toggleId.getAttribute("data-toggle");
+      abertos[id] = !abertos[id];
+      renderAmbientes();
+      return;
+    }
+    const addEl = t.closest("[data-add]");
+    if (addEl){
+      const [ambId, parede] = addEl.getAttribute("data-add").split("|");
+      pendente = { ambienteId: ambId, parede, replaceId: null };
+      document.getElementById("inputFoto").click();
+      return;
+    }
+    const retakeEl = t.closest("[data-retake]");
+    if (retakeEl){
+      const [ambId, parede, fotoId] = retakeEl.getAttribute("data-retake").split("|");
+      pendente = { ambienteId: ambId, parede, replaceId: fotoId };
+      document.getElementById("inputFoto").click();
+      return;
+    }
+    const delEl = t.closest("[data-del]");
+    if (delEl){
+      const [ambId, parede, fotoId] = delEl.getAttribute("data-del").split("|");
+      if (!confirm("Excluir esta foto?")) return;
+      await idbDelete(fotoId);
+      const a = estado.andares[andarAtual].ambientes[ambId];
+      a.paredes[parede].fotos = a.paredes[parede].fotos.filter(f=>f.id!==fotoId);
+      salvarEstado();
+      renderProgresso(); renderAmbientes();
+      toast("Foto excluída");
+      return;
+    }
+    const addParedeEl = t.closest("[data-add-parede]");
+    if (addParedeEl){
+      const ambId = addParedeEl.getAttribute("data-add-parede");
+      const a = estado.andares[andarAtual].ambientes[ambId];
+      a.numParedes++;
+      a.paredes[a.numParedes] = { fotos: [] };
+      salvarEstado();
+      renderProgresso(); renderAmbientes();
+      return;
+    }
+    const viewEl = t.closest("[data-view]");
+    if (viewEl){
+      const [ambId, parede, fotoId] = viewEl.getAttribute("data-view").split("|");
+      const a = estado.andares[andarAtual].ambientes[ambId];
+      const foto = a.paredes[parede].fotos.find(f=>f.id===fotoId);
+      const blob = await idbGet(fotoId);
+      const url = URL.createObjectURL(blob); objectUrls.push(url);
+      document.getElementById("lbImg").src = url;
+      const nomeAmb = ANDARES[andarAtual].ambientes.find(x=>x.id===ambId).nome;
+      document.getElementById("lbInfo").textContent =
+        `${ANDARES[andarAtual].nome} · ${nomeAmb} · Parede ${parede} — ${foto.quem}, ${new Date(foto.ts).toLocaleString("pt-BR")}`;
+      document.getElementById("lightbox").classList.add("aberto");
+      return;
+    }
+  });
+
+  document.getElementById("lbFechar").onclick = () => document.getElementById("lightbox").classList.remove("aberto");
+  document.getElementById("lightbox").addEventListener("click", (e)=>{ if (e.target.id==="lightbox") e.currentTarget.classList.remove("aberto"); });
+
+  document.getElementById("inputFoto").addEventListener("change", async (e)=>{
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file || !pendente) return;
+    const quem = document.getElementById("quemSelect").value;
+    try{
+      const blob = await compressImage(file);
+      const a = estado.andares[andarAtual].ambientes[pendente.ambienteId];
+      if (pendente.replaceId){
+        await idbDelete(pendente.replaceId);
+        const foto = a.paredes[pendente.parede].fotos.find(f=>f.id===pendente.replaceId);
+        const novoIdFoto = novoId(quem);
+        await idbPut(novoIdFoto, blob);
+        foto.id = novoIdFoto; foto.ts = Date.now(); foto.quem = quem;
+        toast("Foto atualizada");
+      } else {
+        const id = novoId(quem);
+        await idbPut(id, blob);
+        a.paredes[pendente.parede].fotos.push({ id, ts: Date.now(), quem });
+        toast("Foto adicionada");
+      }
+      salvarEstado();
+      renderProgresso(); renderAmbientes();
+    } catch(err){
+      console.error(err);
+      toast("Não consegui salvar a foto");
+    }
+    pendente = null;
+  });
+
+  document.getElementById("quemSelect").addEventListener("change", ()=>{
+    localStorage.setItem("obraFotosQuemPadrao", document.getElementById("quemSelect").value);
+  });
+  const quemSalvo = localStorage.getItem("obraFotosQuemPadrao");
+  if (quemSalvo) document.getElementById("quemSelect").value = quemSalvo;
+
+  // ---------- Backup: exporta tudo (estrutura + fotos em base64) num .json ----------
+  document.getElementById("btnExportar").addEventListener("click", async ()=>{
+    toast("Preparando backup...");
+    const pacote = { versao:1, geradoEm: new Date().toISOString(), estado, fotosBase64:{} };
+    for (const andarId in estado.andares){
+      for (const ambId in estado.andares[andarId].ambientes){
+        const a = estado.andares[andarId].ambientes[ambId];
+        for (const n in a.paredes){
+          for (const foto of a.paredes[n].fotos){
+            const blob = await idbGet(foto.id);
+            if (blob) pacote.fotosBase64[foto.id] = await blobToDataURL(blob);
+          }
+        }
+      }
+    }
+    const json = JSON.stringify(pacote);
+    const blob = new Blob([json], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const ts = new Date().toISOString().slice(0,16).replace(/[-:T]/g,"");
+    a.download = `backup-fotos-serena-${ts}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    toast("Backup baixado — pode mandar esse arquivo pro Claude");
+  });
+
+  document.getElementById("btnImportar").addEventListener("click", ()=> document.getElementById("inputImportar").click());
+  document.getElementById("inputImportar").addEventListener("change", async (e)=>{
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!confirm("Importar vai SOMAR este backup ao que já está aqui no aparelho (não apaga o que já existe). Continuar?")) return;
+    try{
+      const texto = await file.text();
+      const pacote = JSON.parse(texto);
+      for (const id in pacote.fotosBase64){
+        const blob = dataURLToBlob(pacote.fotosBase64[id]);
+        await idbPut(id, blob);
+      }
+      // funde estrutura: soma fotos por ambiente/parede sem duplicar id
+      for (const andarId in pacote.estado.andares){
+        if (!estado.andares[andarId]) continue;
+        for (const ambId in pacote.estado.andares[andarId].ambientes){
+          const origem = pacote.estado.andares[andarId].ambientes[ambId];
+          if (!estado.andares[andarId].ambientes[ambId]) continue;
+          const destino = estado.andares[andarId].ambientes[ambId];
+          destino.numParedes = Math.max(destino.numParedes, origem.numParedes);
+          for (const n in origem.paredes){
+            if (!destino.paredes[n]) destino.paredes[n] = { fotos: [] };
+            const idsExistentes = new Set(destino.paredes[n].fotos.map(f=>f.id));
+            for (const foto of origem.paredes[n].fotos){
+              if (!idsExistentes.has(foto.id)) destino.paredes[n].fotos.push(foto);
+            }
+          }
+        }
+      }
+      salvarEstado();
+      renderProgresso(); renderAmbientes();
+      toast("Backup importado");
+    }catch(err){
+      console.error(err);
+      alert("Não consegui ler esse arquivo de backup.");
+    }
+  });
+
+  renderTudo();
+})();
+</script>
+</body>
+</html>
