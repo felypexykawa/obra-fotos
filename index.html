@@ -131,7 +131,7 @@
   <button id="btnImportar">⬆ Importar backup</button>
 </div>
 <input type="file" id="inputImportar" accept="application/json" hidden>
-<input type="file" id="inputFoto" accept="image/*,video/*" capture="environment" hidden>
+<input type="file" id="inputFoto" accept="image/*,video/*" hidden>
 
 <div class="lightbox" id="lightbox">
   <button class="lb-fechar" id="lbFechar">×</button>
@@ -310,20 +310,32 @@
   // ---------- Estado (tudo em array com id — tudo é adicionável dinamicamente) ----------
   const LS_KEY = "obraFotosEstado_v3";
   function estadoPadrao(){
-    const empId = gerarId("emp");
-    const unidId = gerarId("un");
+    // ids FIXOS (nao gerarId) neste ponto de partida — assim, celulares diferentes que nunca
+    // trocaram backup ainda comecam com o MESMO id pro Serena Essence e nao duplicam ao importar.
+    // Empreendimento CRIADO por "+ Empreendimento" ja usa id aleatorio — so o padrao de fabrica é fixo.
     return { empreendimentos: [
-      { id: empId, nome: "Residencial Serena Essence", tipo:"casa",
-        unidades: [ { id: unidId, nome: "Unidade 1", andares: moldeUnidade("casa") } ],
+      { id: "emp_serena_essence_default", nome: "Residencial Serena Essence", tipo:"casa",
+        unidades: [ { id: "un_serena_unidade1_default", nome: "Unidade 1", andares: moldeUnidade("casa") } ],
         areasComuns: null }
     ]};
+  }
+  function sanearEstado(st){
+    // defende contra empreendimento malformado (ex: vindo de um backup/merge incompleto) —
+    // em vez de quebrar a tela ao selecionar, garante a forma minima esperada.
+    st.empreendimentos = (st.empreendimentos||[]).filter(e => e && e.id).map(e => {
+      e.unidades = Array.isArray(e.unidades) ? e.unidades : [];
+      e.unidades.forEach(u => { u.andares = Array.isArray(u.andares) ? u.andares : []; });
+      if (e.areasComuns && !Array.isArray(e.areasComuns.andares)) e.areasComuns.andares = [];
+      return e;
+    });
+    return st;
   }
   function carregarEstado(){
     try{
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return estadoPadrao();
-      const st = JSON.parse(raw);
-      if (!st.empreendimentos || !st.empreendimentos.length) return estadoPadrao();
+      const st = sanearEstado(JSON.parse(raw));
+      if (!st.empreendimentos.length) return estadoPadrao();
       return st;
     }catch(e){ console.error("estado corrompido, recomecando", e); return estadoPadrao(); }
   }
@@ -749,20 +761,21 @@
     pendente = null;
     if (!file || !alvo) return;
     const quem = document.getElementById("quemSelect").value;
-    const andar = getAndarAtual();
-    const amb = andar.ambientes.find(a=>a.id===alvo.ambienteId);
-    const parede = amb.paredes.find(p=>p.id===alvo.paredeId);
     const ehVideo = file.type.startsWith("video/");
     try{
+      const andar = getAndarAtual();
+      const amb = andar && andar.ambientes.find(a=>a.id===alvo.ambienteId);
+      const parede = amb && amb.paredes.find(p=>p.id===alvo.paredeId);
+      if (!parede){ toast("Esse ambiente mudou — abre de novo e tenta outra vez"); return; }
       if (ehVideo && file.size > 80*1024*1024){
         if (!confirm("Esse vídeo tem " + Math.round(file.size/1024/1024) + "MB — pode demorar ou pesar no celular. Salvar mesmo assim?")) return;
       }
       const blob = ehVideo ? file : await compressImage(file);
       if (alvo.replaceId){
-        await idbDelete(alvo.replaceId);
         const foto = parede.fotos.find(f=>f.id===alvo.replaceId);
         const novoId = novoIdFoto(quem);
-        await idbPut(novoId, blob);
+        await idbPut(novoId, blob); // grava o novo ANTES de apagar o antigo — se falhar, o antigo continua intacto
+        await idbDelete(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
         toast("Atualizado");
       } else {
@@ -816,11 +829,15 @@
     const file = e.target.files[0];
     e.target.value = "";
     if (!file) return;
-    if (!confirm("Importar vai SOMAR este backup ao que já está aqui (não apaga o que já existe). Continuar?")) return;
     try{
       const texto = await file.text();
       const pacote = JSON.parse(texto);
-      const base64Map = pacote.midiaBase64 || pacote.fotosBase64 || {};
+      if (pacote.versao !== 3 || !pacote.estado || !Array.isArray(pacote.estado.empreendimentos)){
+        alert("Esse arquivo de backup é de uma versão antiga ou diferente do app — não dá pra importar direto aqui. Me manda que eu ajusto.");
+        return;
+      }
+      if (!confirm("Importar vai SOMAR este backup ao que já está aqui (não apaga o que já existe). Continuar?")) return;
+      const base64Map = pacote.midiaBase64 || {};
       for (const id in base64Map){
         const blob = dataURLToBlob(base64Map[id]);
         await idbPut(id, blob);
@@ -839,9 +856,16 @@
           else fundirAndares(empDestino.areasComuns.andares, empOrigem.areasComuns.andares);
         }
       }
+      sanearEstado(estado);
       salvarEstado();
       renderTudo();
-      toast("Backup importado");
+      const nomes = estado.empreendimentos.map(e=>e.nome.trim().toLowerCase());
+      const duplicado = nomes.find((n,i)=>nomes.indexOf(n)!==i);
+      if (duplicado){
+        alert('Atenção: agora existem 2 empreendimentos chamados "' + duplicado + '" — provavelmente cada celular criou o dele antes de importar o do outro. São duas árvores separadas; me manda o backup que eu te ajudo a juntar.');
+      } else {
+        toast("Backup importado");
+      }
     }catch(err){
       console.error(err);
       alert("Não consegui ler esse arquivo de backup.");
