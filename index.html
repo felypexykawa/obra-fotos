@@ -14,6 +14,9 @@
   header{background:var(--accent);color:#fff;padding:14px 16px 10px;}
   header h1{font-size:17px;margin:0 0 2px;}
   header p{font-size:12px;margin:0;opacity:.9;}
+  .modo-bar{display:flex;gap:6px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line);}
+  .modo-btn{flex:1;padding:8px 6px;border-radius:20px;border:1px solid var(--line);background:#f3f1ec;font-size:12px;color:#555;}
+  .modo-btn.ativo{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;}
   .sel-topo{background:var(--card);padding:10px 14px;border-bottom:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
   .sel-topo > div{flex:1;min-width:130px;}
   .sel-topo label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px;}
@@ -23,7 +26,7 @@
   .tab{flex:1;min-width:90px;padding:10px 0;border:none;border-radius:8px 8px 0 0;background:#e8e5df;color:#555;font-size:13px;font-weight:600;}
   .tab.active{background:var(--card);color:var(--accent-dark);}
   .quem-row{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--card);font-size:13px;border-bottom:1px solid var(--line);}
-  .quem-row select{flex:1;padding:8px;border-radius:6px;border:1px solid var(--line);font-size:14px;}
+  .quem-row select{flex:1;padding:8px;border-radius:6px;border:1px solid var(--line);font-size:14px;min-width:0;}
   .progresso{padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line);font-size:13px;color:var(--sub);}
   .progresso b{color:var(--ink);}
   .barra{height:6px;background:var(--line);border-radius:4px;margin-top:6px;overflow:hidden;}
@@ -40,7 +43,7 @@
   .ambiente-card.aberto .chevron{transform:rotate(180deg);}
   .ambiente-body{display:none;padding:0 14px 14px;border-top:1px solid var(--line);}
   .ambiente-card.aberto .ambiente-body{display:block;}
-  .ambiente-acoes{display:flex;gap:14px;padding:8px 0 4px;font-size:12px;color:var(--sub);}
+  .ambiente-acoes{display:flex;gap:14px;padding:8px 0 4px;font-size:12px;color:var(--sub);flex-wrap:wrap;}
   .ambiente-acoes span{cursor:pointer;}
   .ambiente-acoes .perigo{color:var(--accent-dark);}
   .parede-row{padding:10px 0;border-bottom:1px dashed var(--line);}
@@ -53,6 +56,7 @@
   .foto-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
   .foto-thumb.video::after{content:"▶";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:20px;text-shadow:0 0 4px rgba(0,0,0,.8);}
   .foto-thumb .nota-dot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:#f1c40f;border:1px solid #fff;}
+  .foto-thumb .etapa-tag{position:absolute;top:0;left:0;right:0;font-size:9px;line-height:1.2;padding:2px 3px;background:rgba(0,0,0,.55);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .foto-thumb .mini-btns{position:absolute;bottom:0;left:0;right:0;display:flex;background:rgba(0,0,0,.55);}
   .foto-thumb .mini-btns button{flex:1;border:none;background:transparent;color:#fff;font-size:12px;padding:3px 0;}
   .btn-add-foto{width:74px;height:74px;border-radius:8px;border:2px dashed #c9c5bc;background:transparent;color:var(--sub);font-size:11px;}
@@ -62,7 +66,7 @@
   .regra-box{margin:0 10px 10px;padding:10px 12px;background:#fff8ec;border:1px solid #eadfc0;border-radius:8px;font-size:12px;line-height:1.5;color:#5a4a20;}
   .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;}
   .lightbox.aberto{display:flex;}
-  .lightbox img, .lightbox video{max-width:92vw;max-height:60vh;border-radius:6px;}
+  .lightbox img, .lightbox video{max-width:92vw;max-height:56vh;border-radius:6px;}
   .lightbox .lb-info{color:#fff;font-size:12px;margin-top:10px;text-align:center;padding:0 20px;}
   .lightbox .lb-nota{color:#f1c40f;font-size:13px;margin-top:6px;text-align:center;padding:0 24px;max-width:520px;}
   .lightbox .lb-acoes{margin-top:12px;display:flex;gap:10px;}
@@ -76,9 +80,10 @@
   .modal h3{margin:0 0 12px;font-size:16px;}
   .modal p{font-size:14px;color:#444;line-height:1.4;}
   .modal label{display:block;font-size:12px;color:var(--sub);margin:10px 0 4px;}
-  .modal input[type=text], .modal textarea{width:100%;padding:9px;border-radius:6px;border:1px solid var(--line);font-size:14px;font-family:inherit;}
+  .modal input[type=text], .modal textarea, .modal select{width:100%;padding:9px;border-radius:6px;border:1px solid var(--line);font-size:14px;font-family:inherit;background:#fff;}
   .tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
-  .tipo-btn{padding:12px 6px;border-radius:8px;border:2px solid var(--line);background:#fafaf8;font-size:13px;text-align:center;}
+  .tipo-btn{padding:12px 6px;border-radius:8px;border:2px solid var(--line);background:#fafaf8;font-size:13px;text-align:center;line-height:1.3;}
+  .tipo-btn small{display:block;font-size:11px;color:var(--sub);font-weight:400;margin-top:2px;}
   .tipo-btn.sel{border-color:var(--accent);background:#fdece9;color:var(--accent-dark);font-weight:600;}
   .quick-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
   .quick-btn{padding:6px 10px;border-radius:14px;border:1px solid var(--line);background:#f3f1ec;font-size:12px;}
@@ -89,6 +94,8 @@
   .check-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;}
   .check-row input{width:18px;height:18px;}
   .duas-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .btn-perigo{margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1px solid #d9b3ae;background:#fff;color:var(--accent-dark);font-size:13px;}
+  .nota-modal{font-size:12px;color:var(--sub);margin:8px 0 0;line-height:1.4;}
 </style>
 </head>
 <body>
@@ -98,22 +105,36 @@
   <p id="subtituloTopo">registro por ambiente</p>
 </header>
 
+<div class="modo-bar">
+  <button class="modo-btn" data-modo="construcao" type="button">🏗 Obra em construção</button>
+  <button class="modo-btn" data-modo="manutencao" type="button">🔧 Manutenção / pós-obra</button>
+</div>
+
 <div class="sel-topo">
   <div>
     <label>Empreendimento</label>
     <select id="empSelect"></select>
   </div>
-  <button class="btn-mini" id="btnNovoEmp">+ Empreendimento</button>
+  <button class="btn-mini" id="btnNovoEmp" type="button">+ Empreendimento</button>
   <div>
     <label>Unidade / Setor</label>
     <select id="unidSelect"></select>
   </div>
-  <button class="btn-mini" id="btnNovaUnid">+ Unidade</button>
+  <button class="btn-mini" id="btnNovaUnid" type="button">+ Unidade</button>
+</div>
+<div class="ambiente-acoes" style="padding:6px 14px 0;">
+  <span id="btnEditarUnid">✎ editar unidade</span>
+  <span id="btnUnidadesPorAndar" style="display:none;">🏢 gerar unidades por andar</span>
 </div>
 
 <div class="tabs" id="tabs"></div>
 <div class="ambiente-acoes" style="padding:8px 14px 0;">
   <span id="btnNovoAndar">+ Adicionar andar/setor</span>
+  <span id="btnEditarAndar">✎ editar este andar</span>
+</div>
+<div class="quem-row" id="etapaRow" style="display:none;">
+  Etapa atual da obra:
+  <select id="etapaSelect"></select>
 </div>
 <div class="quem-row">
   Quem está fotografando:
@@ -124,29 +145,48 @@
     <option>Outro</option>
   </select>
 </div>
+<div class="quem-row">
+  Mostrar:
+  <select id="filtroEtapaSelect"></select>
+</div>
 <div class="progresso" id="progresso"></div>
 <div class="regra-box">
-  <b>Como usar:</b> cada ambiente pode ter vários pontos de registro (paredes, teto, detalhes). Cada ponto aceita fotos E vídeos, sem limite, cada um com data automática e observação opcional. As fotos ficam agrupadas por mês pra você ver o andamento no tempo.
+  <b>Como usar:</b> escolha o modo lá em cima (obra ou manutenção) — toda foto nova fica marcada com a etapa da obra ou como manutenção. Cada ambiente tem pontos de registro (paredes, teto, detalhes), e cada ponto aceita fotos e vídeos sem limite, com data automática e observação. Andares, ambientes e pontos são todos editáveis.
 </div>
 
-<div style="padding:0 10px;"><button class="btn-add-parede" id="btnNovoAmbiente">+ Adicionar ambiente</button></div>
+<div style="padding:0 10px;"><button class="btn-add-parede" id="btnNovoAmbiente" type="button">+ Adicionar ambiente</button></div>
 <div id="listaAmbientes"></div>
 
 <div class="rodape-acoes">
-  <button id="btnExportar">⬇ Exportar backup</button>
-  <button id="btnImportar">⬆ Importar backup</button>
+  <button id="btnExportar" type="button">⬇ Exportar backup</button>
+  <button id="btnImportar" type="button">⬆ Importar backup</button>
 </div>
 <input type="file" id="inputImportar" accept="application/json" hidden>
 <input type="file" id="inputFoto" accept="image/*,video/*" hidden>
 
 <div class="lightbox" id="lightbox">
-  <button class="lb-fechar" id="lbFechar">×</button>
+  <button class="lb-fechar" id="lbFechar" type="button">×</button>
   <div id="lbMidia"></div>
   <div class="lb-info" id="lbInfo"></div>
   <div class="lb-nota" id="lbNota"></div>
-  <div class="lb-acoes"><button id="lbBtnNota">📝 Editar observação</button></div>
+  <div class="lb-acoes">
+    <button id="lbBtnNota" type="button">📝 Observação</button>
+    <button id="lbBtnEtapa" type="button">🏷 Etapa</button>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- Página inicial: escolha do modo (só aparece quando ainda não há modo salvo) -->
+<div class="modal-fundo" id="modalModo">
+  <div class="modal">
+    <h3>O que você vai fazer hoje?</h3>
+    <p>Isso define como as fotos novas são marcadas. Dá pra trocar a qualquer hora, lá em cima.</p>
+    <div class="tipo-grid" style="grid-template-columns:1fr;">
+      <button class="tipo-btn" type="button" data-modo-inicial="construcao">🏗 Obra em construção<small>fotos marcadas com a etapa da obra</small></button>
+      <button class="tipo-btn" type="button" data-modo-inicial="manutencao">🔧 Manutenção / pós-obra<small>fotos marcadas como manutenção</small></button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal: novo empreendimento -->
 <div class="modal-fundo" id="modalEmp">
@@ -163,15 +203,17 @@
     </div>
     <div id="predioExtras" style="display:none;">
       <div class="duas-col">
-        <div><label>Pavimentos (apês)</label><input type="text" inputmode="numeric" id="predioAndares" placeholder="Ex: 10"></div>
-        <div><label>Andares de garagem</label><input type="text" inputmode="numeric" id="predioGaragens" placeholder="Ex: 2"></div>
+        <div><label>Subsolos (garagem)</label><input type="text" inputmode="numeric" id="predioSubsolos" placeholder="Ex: 2"></div>
+        <div><label>Pavimentos acima do térreo</label><input type="text" inputmode="numeric" id="predioPavimentos" placeholder="Ex: 9"></div>
       </div>
-      <label>Áreas comuns (marca as que existem)</label>
-      <div id="predioAmenidades"></div>
+      <div class="check-row"><input type="checkbox" id="predioCobertura"><label for="predioCobertura" style="margin:0;">Tem cobertura / terraço</label></div>
+      <label>Unidades por andar (padrão — dá pra ajustar andar a andar depois)</label>
+      <input type="text" inputmode="numeric" id="predioUnidadesPorAndar" placeholder="Ex: 4 → 101, 102, 103, 104 em cada andar">
+      <p class="nota-modal">Isso só monta os níveis do prédio. Piscina, salão de festas, academia, garagem no térreo etc. você adiciona no andar onde ficam de verdade — cada andar tem "+ Adicionar ambiente" com sugestões.</p>
     </div>
     <div class="modal-acoes">
-      <button class="cancelar" id="empCancelar">Cancelar</button>
-      <button class="confirmar" id="empConfirmar">Criar</button>
+      <button class="cancelar" id="empCancelar" type="button">Cancelar</button>
+      <button class="confirmar" id="empConfirmar" type="button">Criar</button>
     </div>
   </div>
 </div>
@@ -185,23 +227,61 @@
     <div class="quick-grid" id="ambQuickGrid"></div>
     <label>Observação (opcional)</label>
     <textarea id="ambObsInput" rows="2" placeholder="Detalhe sobre este ambiente"></textarea>
+    <div id="ambAndarWrap" style="display:none;">
+      <label>Fica em qual andar/setor?</label>
+      <select id="ambAndarSelect"></select>
+      <p class="nota-modal">Trocar aqui move o ambiente inteiro, com as fotos, pro outro andar.</p>
+    </div>
     <div class="modal-acoes">
-      <button class="cancelar" id="ambCancelar">Cancelar</button>
-      <button class="confirmar" id="ambConfirmar">Salvar</button>
+      <button class="cancelar" id="ambCancelar" type="button">Cancelar</button>
+      <button class="confirmar" id="ambConfirmar" type="button">Salvar</button>
     </div>
   </div>
 </div>
 
-<!-- Modal generico: texto / confirmar / avisar (substitui prompt/confirm/alert nativos,
-     que ficam bloqueados/silenciosos dentro de navegadores embutidos tipo WhatsApp/Telegram) -->
+<!-- Modal: gerar unidades por andar (prédio) -->
+<div class="modal-fundo" id="modalUnidades">
+  <div class="modal">
+    <h3>Unidades por andar</h3>
+    <p class="nota-modal" style="margin:0 0 6px;">Digite quantas unidades tem em cada andar. O app cria os números sozinho (3° andar com 3 → 301, 302, 303; 10° andar com 2 → 1001, 1002). Só cria o que falta — nunca apaga.</p>
+    <div id="unidadesPorAndarLista"></div>
+    <div class="modal-acoes">
+      <button class="cancelar" id="unidadesCancelar" type="button">Cancelar</button>
+      <button class="confirmar" id="unidadesConfirmar" type="button">Criar unidades</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: editar andar/setor -->
+<div class="modal-fundo" id="modalAndar">
+  <div class="modal">
+    <h3>Editar andar/setor</h3>
+    <label>Nome</label>
+    <input type="text" id="andarNomeInput" placeholder="Ex: Mezanino, Subsolo 2, Cobertura">
+    <label>Posição na lista</label>
+    <div class="duas-col">
+      <button type="button" class="btn-mini" id="andarSubir">← mover pra antes</button>
+      <button type="button" class="btn-mini" id="andarDescer">mover pra depois →</button>
+    </div>
+    <div class="modal-acoes">
+      <button class="cancelar" id="andarCancelar" type="button">Cancelar</button>
+      <button class="confirmar" id="andarConfirmar" type="button">Salvar nome</button>
+    </div>
+    <button type="button" class="btn-perigo" id="andarExcluir">🗑 Excluir este andar/setor</button>
+  </div>
+</div>
+
+<!-- Modal generico: texto / opção / confirmar / avisar (substitui prompt/confirm/alert nativos,
+     que ficam mudos dentro de navegadores embutidos tipo WhatsApp/Telegram) -->
 <div class="modal-fundo" id="modalGenerico">
   <div class="modal">
     <h3 id="genTitulo"></h3>
     <p id="genMsg" style="display:none;"></p>
     <input type="text" id="genInput" style="display:none;">
+    <select id="genSelect" style="display:none;"></select>
     <div class="modal-acoes">
-      <button class="cancelar" id="genCancelar">Cancelar</button>
-      <button class="confirmar" id="genConfirmar">OK</button>
+      <button class="cancelar" id="genCancelar" type="button">Cancelar</button>
+      <button class="confirmar" id="genConfirmar" type="button">OK</button>
     </div>
   </div>
 </div>
@@ -211,10 +291,16 @@
   "use strict";
 
   const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  const AREAS_COMUNS_SUGESTOES = ["Salão de Jogos","Academia","Área de Piscina","Playground","Cinema"];
+  const AREAS_COMUNS_SUGESTOES = ["Hall","Corredor","Garagem","Salão de Festas","Salão de Jogos","Academia","Piscina","Playground","Cinema","Escada","Elevador"];
   const EQUIPAMENTOS_SUGESTOES = ["Placas Solares","Gerador","Bomba de Cisterna","Bomba de Drenagem","Elevador","Bomba de Piscina","Bomba de Cascata","Câmeras"];
 
-  // ---------- Modal genérico (troca prompt/confirm/alert nativos por UI própria) ----------
+  // ---------- Etapas da obra (validadas pelo Felype em 10/09) ----------
+  const ETAPAS_BASE = ["Terreno / Preparação","Fundação","Estrutura","Alvenaria / Vedação","Cobertura","Instalações","Revestimento / Reboco","Esquadrias","Acabamento","Entrega / Habite-se","Pós-obra"];
+  const ETAPAS_PREDIO_EXTRA = ["Fachada","Elevadores","Áreas Comuns"];
+  const ETAPA_MANUTENCAO = "Manutenção";
+  function etapasDoEmp(emp){ return emp && emp.tipo==="predio" ? ETAPAS_BASE.concat(ETAPAS_PREDIO_EXTRA) : ETAPAS_BASE.slice(); }
+
+  // ---------- Modal genérico ----------
   function modalGenerico(opts){
     return new Promise((resolve)=>{
       document.getElementById("genTitulo").textContent = opts.titulo || "";
@@ -224,6 +310,13 @@
       const inputEl = document.getElementById("genInput");
       inputEl.style.display = opts.comInput ? "block" : "none";
       inputEl.value = opts.valorInicial || "";
+      const selEl = document.getElementById("genSelect");
+      selEl.style.display = opts.opcoes ? "block" : "none";
+      selEl.innerHTML = "";
+      if (opts.opcoes){
+        for (const o of opts.opcoes){ const el = document.createElement("option"); el.value = o; el.textContent = o; selEl.appendChild(el); }
+        if (opts.valorInicial && opts.opcoes.includes(opts.valorInicial)) selEl.value = opts.valorInicial;
+      }
       document.getElementById("genCancelar").style.display = opts.apenasOk ? "none" : "block";
       document.getElementById("genConfirmar").textContent = opts.textoOk || "OK";
       const modal = document.getElementById("modalGenerico");
@@ -231,8 +324,13 @@
       if (opts.comInput) setTimeout(()=>inputEl.focus(), 60);
       const ok = document.getElementById("genConfirmar"), can = document.getElementById("genCancelar");
       function limpar(){ modal.classList.remove("aberto"); ok.removeEventListener("click", onOk); can.removeEventListener("click", onCan); inputEl.removeEventListener("keydown", onKey); }
-      function onOk(){ const v = opts.comInput ? inputEl.value.trim() : true; limpar(); resolve(v); }
-      function onCan(){ limpar(); resolve(opts.comInput ? null : false); }
+      function onOk(){
+        let v = true;
+        if (opts.comInput) v = inputEl.value.trim();
+        else if (opts.opcoes) v = selEl.value;
+        limpar(); resolve(v);
+      }
+      function onCan(){ limpar(); resolve((opts.comInput || opts.opcoes) ? null : false); }
       function onKey(e){ if (e.key==="Enter") onOk(); }
       ok.addEventListener("click", onOk);
       can.addEventListener("click", onCan);
@@ -240,12 +338,14 @@
     });
   }
   function pedirTexto(titulo, valorInicial){ return modalGenerico({titulo, comInput:true, valorInicial}); }
+  function pedirOpcao(titulo, opcoes, valorInicial){ return modalGenerico({titulo, opcoes, valorInicial}); }
   function pedirConfirmacao(titulo, msg, textoOk){ return modalGenerico({titulo, msg, textoOk}); }
   function avisar(titulo, msg){ return modalGenerico({titulo, msg, apenasOk:true}); }
 
   function gerarId(prefixo){ return prefixo + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7); }
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
-  // ---------- Moldes padrão por tipo de empreendimento ----------
+  // ---------- Moldes ----------
   function novaParede(nome){ return { id: gerarId("pd"), nome: nome, fotos: [] }; }
   function novoAmbiente(nome, obs, qtdParedes){
     const paredes = [];
@@ -273,40 +373,34 @@
 
   function moldeUnidade(tipo){
     if (tipo==="terreno"){
-      return [ novoAndar("Terreno", [
-        {nome:"Frente"}, {nome:"Lateral Esquerda"}, {nome:"Lateral Direita"}, {nome:"Fundos"}
-      ]) ];
+      return [ novoAndar("Terreno", [ {nome:"Frente"}, {nome:"Lateral Esquerda"}, {nome:"Lateral Direita"}, {nome:"Fundos"} ]) ];
     }
     if (tipo==="casa"){
       return [ novoAndar("Térreo", ROOMS_CASA_PADRAO), novoAndar("2° Pavimento", ROOMS_CASA_2PAV) ];
     }
-    // apto e predio (por unidade dentro do predio) usam o mesmo ponto de partida —
-    // cada unidade real varia (1 quarto, 2 quartos, suíte+quarto...): edite/exclua depois de criar.
     return [ novoAndar("Único", ROOMS_APTO) ];
   }
-  function nomeGaragem(i){
-    const nomes = ["Garagem Subsolo","Garagem Térreo","Garagem 2° Pavimento"];
-    return nomes[i-1] || ("Garagem Nível "+i);
-  }
-  function moldeAreasComuns(numAndares, numGaragens, amenidades){
+  // Prédio: só monta os NÍVEIS (subsolo, térreo, andares, cobertura). O que existe em cada nível
+  // (garagem, piscina, salão...) o usuário adiciona no andar certo — não é pré-colocado no térreo.
+  function moldeAreasComuns(numSubsolos, numPavimentos, temCobertura){
     const andares = [];
-    const terreoAmbientes = [{nome:"Hall de Entrada"}].concat((amenidades||[]).map(a=>({nome:a})));
-    andares.push(novoAndar("Térreo / Entrada", terreoAmbientes));
-    for (let i=1;i<=(numAndares||0);i++){
+    for (let i=(numSubsolos||0); i>=1; i--){
+      andares.push(novoAndar(numSubsolos===1 ? "Subsolo" : ("Subsolo "+i), [{nome:"Garagem"}]));
+    }
+    andares.push(novoAndar("Térreo", [{nome:"Hall de Entrada"}]));
+    for (let i=1;i<=(numPavimentos||0);i++){
       andares.push(novoAndar(i+"° Andar", [{nome:"Corredor"},{nome:"Hall"}]));
     }
-    for (let i=1;i<=(numGaragens||0);i++){
-      andares.push(novoAndar(nomeGaragem(i), [{nome:"Área de Garagem"}]));
-    }
+    if (temCobertura) andares.push(novoAndar("Cobertura", []));
     return andares;
   }
   function moldeEquipamentos(){
     const andar = novoAndar("Equipamentos", [ {nome:"Portão"}, {nome:"Interfone"} ]);
-    andar.id = "an_equipamentos_default"; // id fixo — evita duplicar quando 2 celulares criam o padrão cada um por conta
+    andar.id = "an_equipamentos_default";
     return [ andar ];
   }
 
-  // ---------- IndexedDB (guarda o BLOB da foto/vídeo — localStorage só guarda estrutura) ----------
+  // ---------- IndexedDB ----------
   const DB_NAME = "obraFotosDB", STORE = "fotos";
   function idbOpen(){
     return new Promise((resolve,reject)=>{
@@ -391,7 +485,7 @@
       e.unidades = Array.isArray(e.unidades) ? e.unidades : [];
       e.unidades.forEach(u => { u.andares = Array.isArray(u.andares) ? u.andares : []; });
       if (e.areasComuns && !Array.isArray(e.areasComuns.andares)) e.areasComuns.andares = [];
-      if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0,0,[]) }; // restaura se faltar — evita tela vazia/quebrada
+      if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0,0,false) };
       if (e.equipamentos && !Array.isArray(e.equipamentos.andares)) e.equipamentos.andares = [];
       if (!e.equipamentos && (e.tipo==="casa"||e.tipo==="predio")) e.equipamentos = { andares: moldeEquipamentos() };
       return e;
@@ -416,9 +510,38 @@
   let abertos = {};
   const objectUrls = [];
 
+  // modo (construção/manutenção) e etapa atual por empreendimento — preferências, fora da árvore
+  let modo = localStorage.getItem("obraFotosModo") || null;
+  let filtroEtapa = "__todas__";
+  function etapaAtualDe(empId){ try{ return (JSON.parse(localStorage.getItem("obraFotosEtapaAtual")||"{}"))[empId] || null; }catch(e){ return null; } }
+  function setEtapaAtual(empId, etapa){ let m={}; try{ m = JSON.parse(localStorage.getItem("obraFotosEtapaAtual")||"{}"); }catch(e){} m[empId]=etapa; localStorage.setItem("obraFotosEtapaAtual", JSON.stringify(m)); }
+  function etapaParaNovaFoto(){
+    if (modo==="manutencao") return ETAPA_MANUTENCAO;
+    const emp = getEmp(empAtualId);
+    const lista = etapasDoEmp(emp);
+    const salva = etapaAtualDe(empAtualId);
+    return (salva && lista.includes(salva)) ? salva : lista[0];
+  }
+  function fotosVisiveis(p){
+    if (filtroEtapa==="__todas__") return p.fotos;
+    if (filtroEtapa==="__sem__") return p.fotos.filter(f=>!f.etapa);
+    return p.fotos.filter(f=>f.etapa===filtroEtapa);
+  }
+  // se o filtro atual esconderia esta foto (nova ou refeita), volta pra "todas" — senao parece que nao salvou
+  function garantirVisivel(foto){
+    const visivel = filtroEtapa==="__todas__" || (filtroEtapa==="__sem__" ? !foto.etapa : foto.etapa===filtroEtapa);
+    if (visivel) return "";
+    filtroEtapa = "__todas__";
+    document.getElementById("filtroEtapaSelect").value = "__todas__";
+    return " · filtro voltou pra 'todas'";
+  }
+
   function getEmp(id){ return estado.empreendimentos.find(e=>e.id===id); }
   function contextoPadrao(emp){
-    return emp.unidades.length ? emp.unidades[0].id : (emp.areasComuns ? "__areas_comuns__" : "__equipamentos__");
+    if (emp.unidades.length) return emp.unidades[0].id;
+    if (emp.areasComuns) return "__areas_comuns__";
+    if (emp.equipamentos) return "__equipamentos__";
+    return null;
   }
   (function initUnid(){ unidAtualId = contextoPadrao(getEmp(empAtualId)); })();
 
@@ -432,7 +555,7 @@
     const cont = getUnidadeOuComum();
     if (!cont) return null;
     if (!andarAtualId || !cont.andares.find(a=>a.id===andarAtualId)) andarAtualId = cont.andares[0] ? cont.andares[0].id : null;
-    return cont.andares.find(a=>a.id===andarAtualId);
+    return cont.andares.find(a=>a.id===andarAtualId) || null;
   }
 
   function novoIdFoto(quem){ return quem.replace(/\s+/g,"") + "_" + Date.now() + "_" + Math.random().toString(36).slice(2,8); }
@@ -442,11 +565,41 @@
     setTimeout(()=>t.classList.remove("show"), 1600);
   }
   function limparObjectUrls(){ while(objectUrls.length) URL.revokeObjectURL(objectUrls.pop()); }
-  function formatarMes(ts){
-    const d = new Date(ts);
-    return MESES[d.getMonth()] + "/" + d.getFullYear();
-  }
+  function formatarMes(ts){ const d = new Date(ts); return MESES[d.getMonth()] + "/" + d.getFullYear(); }
   function chaveMes(ts){ const d = new Date(ts); return d.getFullYear()+"-"+String(d.getMonth()).padStart(2,"0"); }
+
+  // ---------- Render: modo / etapa / filtro ----------
+  function renderModo(){
+    document.querySelectorAll(".modo-btn").forEach(b => b.classList.toggle("ativo", b.getAttribute("data-modo")===modo));
+    const emp = getEmp(empAtualId);
+    const etapas = etapasDoEmp(emp);
+    const etapaRow = document.getElementById("etapaRow");
+    etapaRow.style.display = modo==="construcao" ? "flex" : "none";
+    const etapaSel = document.getElementById("etapaSelect");
+    etapaSel.innerHTML = "";
+    for (const et of etapas){ const o = document.createElement("option"); o.value = et; o.textContent = et; etapaSel.appendChild(o); }
+    etapaSel.value = etapaParaNovaFoto()===ETAPA_MANUTENCAO ? etapas[0] : etapaParaNovaFoto();
+    const filtroSel = document.getElementById("filtroEtapaSelect");
+    filtroSel.innerHTML = "";
+    const opcoes = [["__todas__","Todas as fotos"]].concat(etapas.map(e=>[e, "Etapa: "+e])).concat([[ETAPA_MANUTENCAO, "Só manutenção"],["__sem__","Sem etapa marcada"]]);
+    for (const [v,l] of opcoes){ const o = document.createElement("option"); o.value=v; o.textContent=l; filtroSel.appendChild(o); }
+    if (![...filtroSel.options].some(o=>o.value===filtroEtapa)) filtroEtapa = "__todas__";
+    filtroSel.value = filtroEtapa;
+  }
+  document.querySelectorAll(".modo-btn").forEach(b => b.addEventListener("click", ()=>{
+    modo = b.getAttribute("data-modo");
+    localStorage.setItem("obraFotosModo", modo);
+    renderModo(); renderProgresso(); renderAmbientes();
+    toast(modo==="construcao" ? "Modo obra: fotos novas levam a etapa atual" : "Modo manutenção: fotos novas marcadas como manutenção");
+  }));
+  document.querySelectorAll("[data-modo-inicial]").forEach(b => b.addEventListener("click", ()=>{
+    modo = b.getAttribute("data-modo-inicial");
+    localStorage.setItem("obraFotosModo", modo);
+    document.getElementById("modalModo").classList.remove("aberto");
+    renderModo(); renderProgresso(); renderAmbientes();
+  }));
+  document.getElementById("etapaSelect").addEventListener("change", (e)=>{ setEtapaAtual(empAtualId, e.target.value); toast("Etapa atual: " + e.target.value); });
+  document.getElementById("filtroEtapaSelect").addEventListener("change", (e)=>{ filtroEtapa = e.target.value; renderProgresso(); renderAmbientes(); });
 
   // ---------- Render: seletores ----------
   function renderSeletores(){
@@ -465,7 +618,7 @@
       const o = document.createElement("option"); o.value=u.id; o.textContent = u.nome;
       unidSel.appendChild(o);
     }
-    if (emp.tipo==="predio"){
+    if (emp.areasComuns){
       const o = document.createElement("option"); o.value="__areas_comuns__"; o.textContent = "— Áreas Comuns —";
       unidSel.appendChild(o);
     }
@@ -477,10 +630,12 @@
     if (!opcoesValidas.includes(unidAtualId)) unidAtualId = contextoPadrao(emp);
     unidSel.value = unidAtualId;
 
+    document.getElementById("btnUnidadesPorAndar").style.display = (emp.tipo==="predio" && emp.areasComuns) ? "inline" : "none";
     document.getElementById("tituloTopo").textContent = emp.nome;
     let nomeCtx;
     if (unidAtualId==="__areas_comuns__") nomeCtx = "Áreas Comuns";
     else if (unidAtualId==="__equipamentos__") nomeCtx = "Equipamentos";
+    else if (!unidAtualId) nomeCtx = "sem unidade — use + Unidade";
     else nomeCtx = (emp.unidades.find(u=>u.id===unidAtualId)||{nome:""}).nome;
     document.getElementById("subtituloTopo").textContent = nomeCtx + " · registro por ambiente";
   }
@@ -504,6 +659,7 @@
     const atual = getAndarAtual();
     for (const andar of cont.andares){
       const b = document.createElement("button");
+      b.type = "button";
       b.className = "tab" + (atual && andar.id===atual.id ? " active" : "");
       b.textContent = andar.nome;
       b.onclick = () => { andarAtualId = andar.id; abertos = {}; renderTudo(); };
@@ -517,7 +673,7 @@
     if (andar) for (const amb of andar.ambientes){
       for (const p of amb.paredes){
         paredesTotal++;
-        if (p.fotos.length>0) paredesComFoto++;
+        if (fotosVisiveis(p).length>0) paredesComFoto++;
       }
     }
     return {paredesTotal, paredesComFoto};
@@ -526,7 +682,8 @@
     const {paredesTotal, paredesComFoto} = contarProgresso();
     const pct = paredesTotal ? Math.round(100*paredesComFoto/paredesTotal) : 0;
     const el = document.getElementById("progresso");
-    el.innerHTML = `<b>${paredesComFoto} de ${paredesTotal}</b> pontos de registro já têm foto/vídeo neste setor (${pct}%)
+    const sufixo = filtroEtapa==="__todas__" ? "" : " (no filtro atual)";
+    el.innerHTML = `<b>${paredesComFoto} de ${paredesTotal}</b> pontos de registro já têm foto/vídeo neste setor${sufixo} (${pct}%)
       <div class="barra"><div style="width:${pct}%"></div></div>`;
   }
 
@@ -538,13 +695,13 @@
     if (!andar) return;
     for (const amb of andar.ambientes){
       let comFoto=0;
-      for (const p of amb.paredes) if (p.fotos.length>0) comFoto++;
+      for (const p of amb.paredes) if (fotosVisiveis(p).length>0) comFoto++;
       const card = document.createElement("div");
       card.className = "ambiente-card" + (abertos[amb.id] ? " aberto" : "");
       const completo = amb.paredes.length && comFoto===amb.paredes.length;
       card.innerHTML = `
         <div class="ambiente-header" data-toggle="${amb.id}">
-          <span class="nomes"><span class="nome">${amb.nome}</span>${amb.observacao ? '<span class="obs">'+amb.observacao+'</span>' : ''}</span>
+          <span class="nomes"><span class="nome">${esc(amb.nome)}</span>${amb.observacao ? '<span class="obs">'+esc(amb.observacao)+'</span>' : ''}</span>
           <span style="display:flex;align-items:center;">
             <span class="badge ${completo?'completo':''}">${comFoto}/${amb.paredes.length}</span>
             <span class="chevron">▾</span>
@@ -555,17 +712,17 @@
       const body = card.querySelector(".ambiente-body");
       const acoes = document.createElement("div");
       acoes.className = "ambiente-acoes";
-      acoes.innerHTML = `<span data-editar-amb="${amb.id}">✎ editar</span><span class="perigo" data-excluir-amb="${amb.id}">🗑 excluir ambiente</span>`;
+      acoes.innerHTML = `<span data-editar-amb="${amb.id}">✎ editar / mover</span><span class="perigo" data-excluir-amb="${amb.id}">🗑 excluir ambiente</span>`;
       body.appendChild(acoes);
       for (const p of amb.paredes){
         const row = document.createElement("div");
         row.className = "parede-row";
-        row.innerHTML = `<div class="parede-titulo"><span>${p.nome}</span><span class="renomear" data-renomear="${amb.id}|${p.id}">renomear</span></div><div data-grid-wrap="${amb.id}|${p.id}"></div>`;
+        row.innerHTML = `<div class="parede-titulo"><span>${esc(p.nome)}</span><span class="renomear" data-renomear="${amb.id}|${p.id}">renomear</span></div><div data-grid-wrap="${amb.id}|${p.id}"></div>`;
         body.appendChild(row);
         const wrap = row.querySelector("[data-grid-wrap]");
 
         const grupos = {};
-        for (const foto of p.fotos){
+        for (const foto of fotosVisiveis(p)){
           const k = chaveMes(foto.ts);
           if (!grupos[k]) grupos[k] = { label: formatarMes(foto.ts), itens: [] };
           grupos[k].itens.push(foto);
@@ -589,10 +746,11 @@
                 ? `<video src="${url}" muted style="width:100%;height:100%;object-fit:cover;" data-view="${amb.id}|${p.id}|${foto.id}"></video>`
                 : `<img src="${url}" data-view="${amb.id}|${p.id}|${foto.id}">`;
               thumb.innerHTML = `${imgTag}
+                ${foto.etapa ? '<div class="etapa-tag">'+esc(foto.etapa)+'</div>' : ''}
                 ${foto.nota ? '<div class="nota-dot" title="tem observação"></div>' : ''}
                 <div class="mini-btns">
-                  <button data-retake="${amb.id}|${p.id}|${foto.id}">🔄</button>
-                  <button data-del="${amb.id}|${p.id}|${foto.id}">🗑</button>
+                  <button type="button" data-retake="${amb.id}|${p.id}|${foto.id}">🔄</button>
+                  <button type="button" data-del="${amb.id}|${p.id}|${foto.id}">🗑</button>
                 </div>`;
             }
             grid.appendChild(thumb);
@@ -600,6 +758,7 @@
           wrap.appendChild(grid);
         }
         const addBtn = document.createElement("button");
+        addBtn.type = "button";
         addBtn.className = "btn-add-foto";
         addBtn.textContent = "+ Foto/Vídeo";
         addBtn.setAttribute("data-add", amb.id + "|" + p.id);
@@ -609,6 +768,7 @@
         wrap.appendChild(gridSolto);
       }
       const addParedeBtn = document.createElement("button");
+      addParedeBtn.type = "button";
       addParedeBtn.className = "btn-add-parede";
       addParedeBtn.textContent = "+ Adicionar ponto de registro (parede, teto, detalhe...)";
       addParedeBtn.setAttribute("data-add-parede", amb.id);
@@ -618,57 +778,60 @@
 
   function renderTudo(){
     renderSeletores();
+    renderModo();
     renderTabs();
     renderProgresso();
     renderAmbientes();
   }
 
-  // ---------- Modal: novo empreendimento (com assistente de Prédio) ----------
+  // ---------- Modal: novo empreendimento ----------
   let tipoSelecionado = null;
   document.getElementById("btnNovoEmp").addEventListener("click", ()=>{
     tipoSelecionado = null;
     document.getElementById("empNomeInput").value = "";
-    document.getElementById("predioAndares").value = "";
-    document.getElementById("predioGaragens").value = "";
-    document.querySelectorAll(".tipo-btn").forEach(b=>b.classList.remove("sel"));
+    document.getElementById("predioSubsolos").value = "";
+    document.getElementById("predioPavimentos").value = "";
+    document.getElementById("predioCobertura").checked = false;
+    document.getElementById("predioUnidadesPorAndar").value = "";
+    document.querySelectorAll(".tipo-btn[data-tipo]").forEach(b=>b.classList.remove("sel"));
     document.getElementById("predioExtras").style.display = "none";
-    const amenGrid = document.getElementById("predioAmenidades");
-    amenGrid.innerHTML = "";
-    for (const s of AREAS_COMUNS_SUGESTOES){
-      const id = "amen_"+s.replace(/\s+/g,"_");
-      amenGrid.insertAdjacentHTML("beforeend", `<div class="check-row"><input type="checkbox" id="${id}" value="${s}"><label for="${id}" style="margin:0;">${s}</label></div>`);
-    }
     document.getElementById("modalEmp").classList.add("aberto");
   });
   document.getElementById("tipoGrid").addEventListener("click", (e)=>{
     const b = e.target.closest(".tipo-btn");
     if (!b) return;
-    document.querySelectorAll(".tipo-btn").forEach(x=>x.classList.remove("sel"));
+    document.querySelectorAll(".tipo-btn[data-tipo]").forEach(x=>x.classList.remove("sel"));
     b.classList.add("sel");
     tipoSelecionado = b.getAttribute("data-tipo");
     document.getElementById("predioExtras").style.display = tipoSelecionado==="predio" ? "block" : "none";
   });
   document.getElementById("empCancelar").onclick = () => document.getElementById("modalEmp").classList.remove("aberto");
-  document.getElementById("empConfirmar").addEventListener("click", async ()=>{
+  document.getElementById("empConfirmar").addEventListener("click", ()=>{
     const nome = document.getElementById("empNomeInput").value.trim();
     if (!nome || !tipoSelecionado){ toast("Preenche o nome e escolhe o tipo"); return; }
     const unidId = gerarId("un");
     const novoEmp = { id: gerarId("emp"), nome, tipo: tipoSelecionado,
-      unidades: tipoSelecionado==="terreno"
-        ? [ { id: unidId, nome: "Terreno", andares: moldeUnidade(tipoSelecionado) } ]
-        : [ { id: unidId, nome: "Unidade 1", andares: moldeUnidade(tipoSelecionado) } ],
+      unidades: [ { id: unidId, nome: (tipoSelecionado==="terreno" ? "Terreno" : "Unidade 1"), andares: moldeUnidade(tipoSelecionado) } ],
       areasComuns: null, equipamentos: null };
     if (tipoSelecionado==="predio"){
-      const numAndares = parseInt(document.getElementById("predioAndares").value, 10) || 0;
-      const numGaragens = parseInt(document.getElementById("predioGaragens").value, 10) || 0;
-      const amenidades = [...document.querySelectorAll('#predioAmenidades input:checked')].map(i=>i.value);
-      novoEmp.areasComuns = { andares: moldeAreasComuns(numAndares, numGaragens, amenidades) };
+      const numSubsolos = parseInt(document.getElementById("predioSubsolos").value, 10) || 0;
+      const numPavimentos = parseInt(document.getElementById("predioPavimentos").value, 10) || 0;
+      const temCobertura = document.getElementById("predioCobertura").checked;
+      novoEmp.areasComuns = { andares: moldeAreasComuns(numSubsolos, numPavimentos, temCobertura) };
+      const porAndar = parseInt(document.getElementById("predioUnidadesPorAndar").value, 10) || 0;
+      if (porAndar > 0){
+        const mapa = {};
+        for (const an of novoEmp.areasComuns.andares) if (ehAndarNumerado(an)) mapa[an.id] = porAndar;
+        novoEmp.unidades = [];
+        gerarUnidadesPorAndar(novoEmp, mapa);
+        if (!novoEmp.unidades.length) novoEmp.unidades.push({ id: unidId, nome: "Unidade 1", andares: moldeUnidade("predio") });
+      }
     }
     if (tipoSelecionado==="casa" || tipoSelecionado==="predio"){
       novoEmp.equipamentos = { andares: moldeEquipamentos() };
     }
     estado.empreendimentos.push(novoEmp);
-    empAtualId = novoEmp.id; unidAtualId = unidId; andarAtualId = null; abertos = {};
+    empAtualId = novoEmp.id; unidAtualId = novoEmp.unidades.length ? novoEmp.unidades[0].id : "__areas_comuns__"; andarAtualId = null; abertos = {};
     salvarEstado();
     document.getElementById("modalEmp").classList.remove("aberto");
     renderTudo();
@@ -689,6 +852,7 @@
 
   document.getElementById("btnNovoAndar").addEventListener("click", async ()=>{
     const cont = getUnidadeOuComum();
+    if (!cont) return;
     const nome = await pedirTexto("Novo andar/setor", "");
     if (!nome) return;
     const novoAnd = novoAndar(nome, []);
@@ -699,7 +863,133 @@
     toast("Andar/setor adicionado");
   });
 
-  // ---------- Modal: novo/editar ambiente ----------
+  // ---------- Unidades por andar (prédio): 3° andar com 3 → 301, 302, 303 ----------
+  function ehAndarNumerado(andar){ return /^\s*\d+\s*[°º]?\s*(andar|pav)/i.test(andar.nome); }
+  function prefixoUnidade(andar){
+    const m = andar.nome.match(/^\s*(\d+)/);
+    return (ehAndarNumerado(andar) && m) ? String(parseInt(m[1],10)) : (andar.nome.trim() + " ");
+  }
+  function gerarUnidadesPorAndar(emp, mapaQtd){
+    let criadas = 0;
+    const nomesExistentes = new Set(emp.unidades.map(u=>u.nome.trim().toLowerCase()));
+    for (const andar of emp.areasComuns.andares){
+      const qtd = mapaQtd[andar.id] || 0;
+      // idempotencia por (andar, numero) — sobrevive a renomear a unidade ("101" -> "Apto 101" continua sendo a n° 1 do andar)
+      const numerosNoAndar = new Set(emp.unidades.filter(u=>u.andarRef===andar.id && u.numero).map(u=>u.numero));
+      for (let i=1;i<=qtd;i++){
+        const nome = prefixoUnidade(andar) + String(i).padStart(2,"0");
+        if (numerosNoAndar.has(i) || nomesExistentes.has(nome.toLowerCase())) continue;
+        emp.unidades.push({ id: gerarId("un"), nome, andarRef: andar.id, numero: i, andares: moldeUnidade("predio") });
+        nomesExistentes.add(nome.toLowerCase()); numerosNoAndar.add(i); criadas++;
+      }
+    }
+    return criadas;
+  }
+  document.getElementById("btnUnidadesPorAndar").addEventListener("click", ()=>{
+    const emp = getEmp(empAtualId);
+    if (!emp.areasComuns) return;
+    const lista = document.getElementById("unidadesPorAndarLista");
+    lista.innerHTML = "";
+    for (const andar of emp.areasComuns.andares){
+      const atual = emp.unidades.filter(u=>u.andarRef===andar.id).length;
+      lista.insertAdjacentHTML("beforeend",
+        `<div class="duas-col" style="align-items:center;margin-top:6px;">
+           <div style="font-size:13px;">${esc(andar.nome)}<br><small style="color:var(--sub)">hoje: ${atual} unidade(s)</small></div>
+           <input type="text" inputmode="numeric" data-unid-andar="${andar.id}" value="${atual}">
+         </div>`);
+    }
+    document.getElementById("modalUnidades").classList.add("aberto");
+  });
+  document.getElementById("unidadesCancelar").onclick = () => document.getElementById("modalUnidades").classList.remove("aberto");
+  document.getElementById("unidadesConfirmar").addEventListener("click", ()=>{
+    const emp = getEmp(empAtualId);
+    const mapa = {};
+    document.querySelectorAll("#unidadesPorAndarLista [data-unid-andar]").forEach(inp => {
+      mapa[inp.getAttribute("data-unid-andar")] = parseInt(inp.value, 10) || 0;
+    });
+    const criadas = gerarUnidadesPorAndar(emp, mapa);
+    salvarEstado();
+    document.getElementById("modalUnidades").classList.remove("aberto");
+    renderTudo();
+    toast(criadas ? (criadas + " unidade(s) criada(s)") : "Nada novo pra criar — já existiam");
+  });
+
+  document.getElementById("btnEditarUnid").addEventListener("click", async ()=>{
+    const emp = getEmp(empAtualId);
+    const unid = emp.unidades.find(u=>u.id===unidAtualId);
+    if (!unid){ await avisar("Setor especial", "Áreas Comuns e Equipamentos não são unidades — pra mexer neles, edite os andares e ambientes direto."); return; }
+    const escolha = await pedirOpcao('Unidade "'+unid.nome+'"', ["Renomear","Excluir"], "Renomear");
+    if (escolha===null) return;
+    if (escolha==="Renomear"){
+      const nome = await pedirTexto("Nome da unidade", unid.nome);
+      if (!nome) return;
+      unid.nome = nome; salvarEstado(); renderTudo(); toast("Unidade renomeada"); return;
+    }
+    let total = 0; for (const an of unid.andares) total += contarFotosAndar(an);
+    if (total > 0){ await avisar("Não dá pra excluir", 'A unidade "'+unid.nome+'" tem '+total+' foto(s)/vídeo(s). Pra proteger o registro, só dá pra excluir unidade zerada.'); return; }
+    if (emp.unidades.length === 1 && !emp.areasComuns && !emp.equipamentos){ await avisar("Última unidade", "Esse empreendimento só tem esta unidade — sem ela não sobra nada pra mostrar. Renomeie em vez de excluir, ou crie outra antes."); return; }
+    const ok = await pedirConfirmacao("Excluir unidade", 'Excluir "'+unid.nome+'"? Está zerada, não perde foto nenhuma.', "Excluir");
+    if (!ok) return;
+    emp.unidades = emp.unidades.filter(u=>u.id!==unid.id);
+    unidAtualId = contextoPadrao(emp); andarAtualId = null; abertos = {};
+    salvarEstado(); renderTudo(); toast("Unidade excluída");
+  });
+
+  // ---------- Modal: editar andar (nome, posição, excluir) ----------
+  function contarFotosAndar(andar){
+    let n=0; for (const amb of andar.ambientes) for (const p of amb.paredes) n += p.fotos.length; return n;
+  }
+  document.getElementById("btnEditarAndar").addEventListener("click", async ()=>{
+    const andar = getAndarAtual();
+    if (!andar){ await avisar("Sem andar", "Este setor ainda não tem andar. Usa '+ Adicionar andar/setor' primeiro."); return; }
+    document.getElementById("andarNomeInput").value = andar.nome;
+    document.getElementById("modalAndar").classList.add("aberto");
+  });
+  function moverAndar(delta){
+    const cont = getUnidadeOuComum();
+    const andar = getAndarAtual();
+    if (!cont || !andar) return;
+    const i = cont.andares.findIndex(a=>a.id===andar.id);
+    const j = i + delta;
+    if (j < 0 || j >= cont.andares.length){ toast(delta<0 ? "Já é o primeiro" : "Já é o último"); return; }
+    [cont.andares[i], cont.andares[j]] = [cont.andares[j], cont.andares[i]];
+    salvarEstado();
+    renderTabs();
+    toast("Posição atualizada");
+  }
+  document.getElementById("andarSubir").addEventListener("click", ()=> moverAndar(-1));
+  document.getElementById("andarDescer").addEventListener("click", ()=> moverAndar(1));
+  document.getElementById("andarCancelar").onclick = () => document.getElementById("modalAndar").classList.remove("aberto");
+  document.getElementById("andarConfirmar").addEventListener("click", ()=>{
+    const andar = getAndarAtual();
+    const nome = document.getElementById("andarNomeInput").value.trim();
+    if (!andar || !nome){ toast("Dá um nome pro andar"); return; }
+    andar.nome = nome;
+    salvarEstado();
+    document.getElementById("modalAndar").classList.remove("aberto");
+    renderTudo();
+    toast("Andar atualizado");
+  });
+  document.getElementById("andarExcluir").addEventListener("click", async ()=>{
+    const cont = getUnidadeOuComum();
+    const andar = getAndarAtual();
+    if (!cont || !andar) return;
+    const total = contarFotosAndar(andar);
+    if (total > 0){
+      await avisar("Não dá pra excluir", 'O andar "'+andar.nome+'" tem '+total+' foto(s)/vídeo(s) em algum ambiente. Pra proteger o registro, só dá pra excluir andar que está zerado — move ou apaga os ambientes com foto antes.');
+      return;
+    }
+    const ok = await pedirConfirmacao("Excluir andar/setor", 'Excluir "'+andar.nome+'" e os '+andar.ambientes.length+' ambiente(s) dele? Está tudo zerado, não perde foto nenhuma.', "Excluir");
+    if (!ok) return;
+    cont.andares = cont.andares.filter(a=>a.id!==andar.id);
+    andarAtualId = null; abertos = {};
+    salvarEstado();
+    document.getElementById("modalAndar").classList.remove("aberto");
+    renderTudo();
+    toast("Andar excluído");
+  });
+
+  // ---------- Modal: novo/editar ambiente (com mover de andar) ----------
   let ambienteEditandoId = null;
   function abrirModalAmbiente(ambienteExistente){
     ambienteEditandoId = ambienteExistente ? ambienteExistente.id : null;
@@ -719,25 +1009,54 @@
         quick.appendChild(b);
       }
     }
+    const wrap = document.getElementById("ambAndarWrap");
+    const sel = document.getElementById("ambAndarSelect");
+    sel.innerHTML = "";
+    if (ambienteExistente){
+      const cont = getUnidadeOuComum();
+      const atual = getAndarAtual();
+      for (const an of cont.andares){ const o = document.createElement("option"); o.value = an.id; o.textContent = an.nome; sel.appendChild(o); }
+      if (atual) sel.value = atual.id;
+      wrap.style.display = (atual && cont.andares.length > 1) ? "block" : "none";
+    } else {
+      wrap.style.display = "none";
+    }
     document.getElementById("modalAmbiente").classList.add("aberto");
   }
-  document.getElementById("btnNovoAmbiente").addEventListener("click", ()=> abrirModalAmbiente(null));
+  document.getElementById("btnNovoAmbiente").addEventListener("click", async ()=>{
+    if (!getAndarAtual()){ await avisar("Sem andar", "Este setor ainda não tem andar. Usa '+ Adicionar andar/setor' primeiro."); return; }
+    abrirModalAmbiente(null);
+  });
   document.getElementById("ambCancelar").onclick = () => document.getElementById("modalAmbiente").classList.remove("aberto");
   document.getElementById("ambConfirmar").onclick = () => {
     const nome = document.getElementById("ambNomeInput").value.trim();
     if (!nome){ toast("Dá um nome pro ambiente"); return; }
     const obs = document.getElementById("ambObsInput").value.trim();
     const andar = getAndarAtual();
+    if (!andar) return;
+    let mensagem = "Ambiente adicionado";
     if (ambienteEditandoId){
       const amb = andar.ambientes.find(a=>a.id===ambienteEditandoId);
+      if (!amb) return;
       amb.nome = nome; amb.observacao = obs;
+      mensagem = "Ambiente atualizado";
+      const destinoId = document.getElementById("ambAndarSelect").value;
+      if (document.getElementById("ambAndarWrap").style.display !== "none" && destinoId && destinoId !== andar.id){
+        const cont = getUnidadeOuComum();
+        const destino = cont.andares.find(a=>a.id===destinoId);
+        if (destino){
+          andar.ambientes = andar.ambientes.filter(a=>a.id!==amb.id);
+          destino.ambientes.push(amb);
+          mensagem = 'Movido pra "'+destino.nome+'"';
+        }
+      }
     } else {
       andar.ambientes.push(novoAmbiente(nome, obs, 1));
     }
     salvarEstado();
     document.getElementById("modalAmbiente").classList.remove("aberto");
     renderProgresso(); renderAmbientes();
-    toast(ambienteEditandoId ? "Ambiente atualizado" : "Ambiente adicionado");
+    toast(mensagem);
   };
 
   // ---------- Ações da lista (delegação) ----------
@@ -839,35 +1158,51 @@
     }
   });
 
-  async function abrirLightbox(ambId, paredeId, fotoId){
+  function acharFoto(ambId, paredeId, fotoId){
     const andar = getAndarAtual();
     const amb = andar && andar.ambientes.find(a=>a.id===ambId);
     const parede = amb && amb.paredes.find(p=>p.id===paredeId);
     const foto = parede && parede.fotos.find(f=>f.id===fotoId);
-    if (!foto) { toast("Esse registro não existe mais"); return; }
-    const blob = await idbGet(fotoId);
-    const url = URL.createObjectURL(blob); objectUrls.push(url);
-    const midia = document.getElementById("lbMidia");
-    midia.innerHTML = foto.tipo==="video" ? `<video src="${url}" controls autoplay></video>` : `<img src="${url}">`;
+    return { andar, amb, parede, foto };
+  }
+  function atualizarLightboxTexto(ctx){
     document.getElementById("lbInfo").textContent =
-      `${getEmp(empAtualId).nome} · ${andar.nome} · ${amb.nome} · ${parede.nome} — ${foto.quem}, ${new Date(foto.ts).toLocaleString("pt-BR")}`;
-    document.getElementById("lbNota").textContent = foto.nota ? ("Obs.: " + foto.nota) : "";
+      `${getEmp(empAtualId).nome} · ${ctx.andar.nome} · ${ctx.amb.nome} · ${ctx.parede.nome} — ${ctx.foto.quem}, ${new Date(ctx.foto.ts).toLocaleString("pt-BR")} · ${ctx.foto.etapa || "sem etapa"}`;
+    document.getElementById("lbNota").textContent = ctx.foto.nota ? ("Obs.: " + ctx.foto.nota) : "";
+  }
+  async function abrirLightbox(ambId, paredeId, fotoId){
+    const ctx = acharFoto(ambId, paredeId, fotoId);
+    if (!ctx.foto){ toast("Esse registro não existe mais"); return; }
+    const blob = await idbGet(fotoId);
+    if (!blob){ toast("Arquivo da foto não encontrado neste aparelho"); return; }
+    const url = URL.createObjectURL(blob); objectUrls.push(url);
+    document.getElementById("lbMidia").innerHTML = ctx.foto.tipo==="video" ? `<video src="${url}" controls autoplay></video>` : `<img src="${url}">`;
+    atualizarLightboxTexto(ctx);
     document.getElementById("lightbox").dataset.alvo = ambId + "|" + paredeId + "|" + fotoId;
     document.getElementById("lightbox").classList.add("aberto");
   }
   document.getElementById("lbBtnNota").addEventListener("click", async ()=>{
     const [ambId, paredeId, fotoId] = document.getElementById("lightbox").dataset.alvo.split("|");
-    const andar = getAndarAtual();
-    const amb = andar && andar.ambientes.find(a=>a.id===ambId);
-    const parede = amb && amb.paredes.find(p=>p.id===paredeId);
-    const foto = parede && parede.fotos.find(f=>f.id===fotoId);
-    if (!foto) return;
-    const nova = await pedirTexto("Observação deste registro", foto.nota || "");
+    const ctx = acharFoto(ambId, paredeId, fotoId);
+    if (!ctx.foto) return;
+    const nova = await pedirTexto("Observação deste registro", ctx.foto.nota || "");
     if (nova===null) return;
-    foto.nota = nova;
+    ctx.foto.nota = nova;
     salvarEstado();
-    document.getElementById("lbNota").textContent = foto.nota ? ("Obs.: " + foto.nota) : "";
+    atualizarLightboxTexto(ctx);
     renderAmbientes();
+  });
+  document.getElementById("lbBtnEtapa").addEventListener("click", async ()=>{
+    const [ambId, paredeId, fotoId] = document.getElementById("lightbox").dataset.alvo.split("|");
+    const ctx = acharFoto(ambId, paredeId, fotoId);
+    if (!ctx.foto) return;
+    const opcoes = etapasDoEmp(getEmp(empAtualId)).concat([ETAPA_MANUTENCAO]);
+    const nova = await pedirOpcao("Etapa desta foto", opcoes, ctx.foto.etapa || opcoes[0]);
+    if (nova===null) return;
+    ctx.foto.etapa = nova;
+    salvarEstado();
+    atualizarLightboxTexto(ctx);
+    renderProgresso(); renderAmbientes();
   });
   document.getElementById("lbFechar").onclick = () => {
     document.getElementById("lightbox").classList.remove("aberto");
@@ -897,16 +1232,19 @@
       const blob = ehVideo ? file : await compressImage(file);
       if (alvo.replaceId){
         const foto = parede.fotos.find(f=>f.id===alvo.replaceId);
+        if (!foto){ toast("Esse registro não existe mais"); return; }
         const novoId = novoIdFoto(quem);
         await idbPut(novoId, blob);
         await idbDelete(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
-        toast("Atualizado");
+        if (!foto.etapa) foto.etapa = etapaParaNovaFoto(); // foto antiga sem etapa ganha a atual ao ser refeita
+        toast("Atualizado" + garantirVisivel(foto));
       } else {
         const id = novoIdFoto(quem);
         await idbPut(id, blob);
-        parede.fotos.push({ id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto" });
-        toast(ehVideo ? "Vídeo adicionado" : "Foto adicionada");
+        const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFoto() };
+        parede.fotos.push(novaFoto);
+        toast((ehVideo ? "Vídeo adicionado" : "Foto adicionada") + " · " + novaFoto.etapa + garantirVisivel(novaFoto));
       }
       salvarEstado();
       renderProgresso(); renderAmbientes();
@@ -922,17 +1260,17 @@
   const quemSalvo = localStorage.getItem("obraFotosQuemPadrao");
   if (quemSalvo) document.getElementById("quemSelect").value = quemSalvo;
 
-  // ---------- Backup: exporta tudo (estrutura + midia em base64) num .json ----------
+  // ---------- Backup ----------
+  function* todasParedes(){
+    for (const emp of estado.empreendimentos){
+      for (const u of emp.unidades) for (const an of u.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
+      if (emp.areasComuns) for (const an of emp.areasComuns.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
+      if (emp.equipamentos) for (const an of emp.equipamentos.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
+    }
+  }
   document.getElementById("btnExportar").addEventListener("click", async ()=>{
     toast("Preparando backup...");
     const pacote = { versao:3, geradoEm: new Date().toISOString(), estado, midiaBase64:{} };
-    function* todasParedes(){
-      for (const emp of estado.empreendimentos){
-        for (const u of emp.unidades) for (const an of u.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
-        if (emp.areasComuns) for (const an of emp.areasComuns.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
-        if (emp.equipamentos) for (const an of emp.equipamentos.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
-      }
-    }
     for (const p of todasParedes()){
       for (const foto of p.fotos){
         const blob = await idbGet(foto.id);
@@ -1018,6 +1356,7 @@
   }
 
   renderTudo();
+  if (!modo) document.getElementById("modalModo").classList.add("aberto");
 })();
 </script>
 </body>
