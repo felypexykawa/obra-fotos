@@ -163,7 +163,7 @@
   <button id="btnExportar" type="button">⬇ Exportar backup</button>
   <button id="btnImportar" type="button">⬆ Importar backup</button>
 </div>
-<input type="file" id="inputImportar" accept="application/json" hidden>
+<input type="file" id="inputImportar" accept="application/json" multiple hidden>
 <input type="file" id="inputFoto" accept="image/*,video/*" hidden>
 
 <div class="lightbox" id="lightbox">
@@ -863,7 +863,8 @@
   // ---------- Estado ----------
   // A versão nova grava na SUA chave. Uma aba com a versão antiga (mesma chave v3, sem aviso de outra aba)
   // gravava por cima do que a nova tinha feito e apagava fotos; agora o que ela escreve só é ABSORVIDO.
-  const LS_KEY = "obraFotosEstado_v4", LS_KEY_ANTIGA = "obraFotosEstado_v3", LS_REV = "obraFotosRevisao";
+  const LS_KEY = "obraFotosEstado_v4", LS_KEY_ANTIGA = "obraFotosEstado_v3", LS_REV = "obraFotosRevisao", LS_CARIMBO = "obraFotosCarimbo";
+  let carimboJaUnido = ""; // último carimbo de outra aba que já entrou na nossa árvore
   function estadoPadrao(){
     return { empreendimentos: [
       { id: "emp_serena_essence_default", nome: "Residencial Serena Essence", tipo:"casa",
@@ -906,14 +907,18 @@
   }
   function salvarEstado(){
     try{
-      // outra aba desta versão gravou depois de nós carregarmos e o aviso ainda não chegou: junta antes de gravar por cima
-      const revDisco = parseInt(localStorage.getItem(LS_REV)||"0", 10) || 0;
-      if (revDisco > (estado.revisao||0)){
-        try{ const outro = sanearEstado(JSON.parse(localStorage.getItem(LS_KEY))); fundirEstados(estado, outro); }catch(e){}
-        estado.revisao = revDisco;
+      // outra aba gravou depois da nossa última gravação/união e o aviso ainda não chegou: junta DENTRO da nossa
+      // árvore antes de gravar por cima. O árbitro é um CARIMBO único por gravação — um contador que duas abas
+      // calculam igual empata, e aí as duas ficavam cegas uma para a outra. Aqui a nossa memória é a mais nova
+      // (toda edição grava na hora), então os campos ficam os nossos; só o que falta entra.
+      const carimboDisco = localStorage.getItem(LS_CARIMBO) || "";
+      if (carimboDisco && carimboDisco !== (estado.carimbo||"") && carimboDisco !== carimboJaUnido){
+        try{ const outro = sanearEstado(JSON.parse(localStorage.getItem(LS_KEY))); fundirEstados(estado, outro); estado.revisao = Math.max(estado.revisao||0, outro.revisao||0); carimboJaUnido = carimboDisco; }catch(e){}
       }
       estado.revisao = (estado.revisao||0) + 1;
-      localStorage.setItem(LS_REV, String(estado.revisao)); // revisão antes da árvore: quem receber o aviso da árvore já vê a revisão nova
+      estado.carimbo = gerarId("g");
+      localStorage.setItem(LS_CARIMBO, estado.carimbo); // carimbo e revisão antes da árvore: quem receber o aviso da árvore já vê os dois
+      localStorage.setItem(LS_REV, String(estado.revisao));
       localStorage.setItem(LS_KEY, JSON.stringify(estado));
       return true;
     }catch(e){
@@ -966,20 +971,22 @@
       return;
     }
     if (e.key !== LS_KEY || !e.newValue) return;
-    // a revisão vem do PRÓPRIO valor gravado (a chave separada pode ainda não ter chegado nesta aba)
-    let revDeles = 0; try{ revDeles = JSON.parse(e.newValue).revisao || 0; }catch(_){}
-    const revDisco = Math.max(revDeles, parseInt(localStorage.getItem(LS_REV)||"0", 10) || 0);
-    if (revDisco <= (estado.revisao||0)) return; // o que está no disco já é o nosso
-    // UNIÃO, não troca: duas abas gravando quase juntas podem ter se atropelado (a leitura da revisão não é
-    // atômica entre abas); o que esta aba tem e a outra não viu entra na árvore dela — lápides impedem
-    // que exclusão volte. Se a união trouxe algo nosso, grava de novo para as abas convergirem.
-    const deles = carregarEstado();
-    const antesUniao = JSON.stringify(deles);
-    fundirEstados(deles, estado);
-    estado = deles;
+    let deles = null; try{ deles = sanearEstado(JSON.parse(e.newValue)); }catch(_){ return; }
+    const carimbo = deles.carimbo || "";
+    if (carimbo && (carimbo === (estado.carimbo||"") || carimbo === carimboJaUnido)) return; // eco nosso ou já unido
+    // UNIÃO DENTRO da nossa árvore — nunca troca o objeto: quem está no meio de uma edição (observação, etapa,
+    // renomear) segura referência para ele e perderia a edição. A gravação da outra aba é mais nova que a
+    // nossa última leitura, então os campos dela (nome, observação, etapa) entram; lápides impedem que
+    // exclusão volte. Se a união trouxe algo nosso que ela não tinha, grava de novo para as abas convergirem
+    // (idempotente: não gera ping-pong).
+    const assinatura = ()=> JSON.stringify([estado.empreendimentos, estado.removidos]);
+    const antesUniao = assinatura();
+    fundirEstados(estado, deles, { campos: true });
+    estado.revisao = Math.max(estado.revisao||0, deles.revisao||0);
+    carimboJaUnido = carimbo;
     if (!getEmp(empAtualId)){ empAtualId = estado.empreendimentos[0].id; unidAtualId = contextoPadrao(getEmp(empAtualId)); andarAtualId = null; }
     else if (!getUnidadeOuComum()){ unidAtualId = contextoPadrao(getEmp(empAtualId)); andarAtualId = null; }
-    if (JSON.stringify(estado) !== antesUniao) salvarEstado();
+    if (assinatura() !== antesUniao) salvarEstado();
     renderTudo(); toast("Dados atualizados por outra aba do app");
   });
   let empAtualId = estado.empreendimentos[0].id;
@@ -1429,7 +1436,11 @@
     if (emp.unidades.length === 1 && !emp.areasComuns && !emp.equipamentos){ await avisar("Última unidade", "Esse empreendimento só tem esta unidade — sem ela não sobra nada pra mostrar. Renomeie em vez de excluir, ou crie outra antes."); return; }
     const ok = await pedirConfirmacao("Excluir unidade", 'Excluir "'+unid.nome+'"? Está zerada, não perde foto nenhuma.', "Excluir");
     if (!ok) return;
-    emp.unidades = emp.unidades.filter(u=>u.id!==unid.id);
+    const empAgora = getEmp(emp.id), unidAgora = empAgora && empAgora.unidades.find(u=>u.id===unid.id);
+    if (!unidAgora){ toast("Essa unidade já não existe"); renderTudo(); return; }
+    if (fotosDeUnid(unidAgora)){ toast("Chegou foto nessa unidade agora — não excluí"); renderTudo(); return; }
+    marcarRemovido(unid.id);
+    empAgora.unidades = empAgora.unidades.filter(u=>u.id!==unid.id);
     unidAtualId = contextoPadrao(emp); andarAtualId = null; abertos = {};
     salvarEstado(); renderTudo(); toast("Unidade excluída");
   });
@@ -1513,8 +1524,11 @@
     }
     const ok = await pedirConfirmacao("Excluir andar/setor", 'Excluir "'+andar.nome+'" e os '+andar.ambientes.length+' ambiente(s) dele? Está tudo zerado, não perde foto nenhuma.', "Excluir");
     if (!ok) return;
-    const contAgora = getUnidadeOuComum(); // outra aba pode ter trocado a árvore enquanto o modal esperava
-    if (!contAgora || !contAgora.andares.find(a=>a.id===andar.id)){ toast("Esse andar já não existe"); renderTudo(); return; }
+    const contAgora = getUnidadeOuComum(); // outra aba pode ter mexido enquanto o modal esperava
+    const andarAgora = contAgora && contAgora.andares.find(a=>a.id===andar.id);
+    if (!andarAgora){ toast("Esse andar já não existe"); renderTudo(); return; }
+    if (contarFotosAndar(andarAgora) > 0){ toast("Chegou foto nesse andar agora — não excluí"); renderTudo(); return; }
+    marcarRemovido(andar.id);
     contAgora.andares = contAgora.andares.filter(a=>a.id!==andar.id);
     andarAtualId = null; abertos = {};
     salvarEstado();
@@ -1627,7 +1641,12 @@
       }
       const ok = await pedirConfirmacao("Excluir ambiente", 'Excluir "'+amb.nome+'"? Ele está zerado (sem fotos), então não perde registro nenhum.', "Excluir");
       if (!ok) return;
-      andar.ambientes = andar.ambientes.filter(a=>a.id!==ambId);
+      const andarAgora = getAndarAtual(); // re-resolve: outra aba pode ter fotografado aqui enquanto o modal esperava
+      const ambAgora = andarAgora && andarAgora.ambientes.find(a=>a.id===ambId);
+      if (!ambAgora){ toast("Esse ambiente já não existe"); renderAmbientes(); return; }
+      if (fotosDeAmb(ambAgora)){ toast("Chegou foto nesse ambiente agora — não excluí"); renderAmbientes(); return; }
+      marcarRemovido(ambId);
+      andarAgora.ambientes = andarAgora.ambientes.filter(a=>a.id!==ambId);
       salvarEstado();
       renderProgresso(); renderAmbientes();
       toast("Ambiente excluído");
@@ -1805,7 +1824,11 @@
         msg = (ehVideo ? "Vídeo salvo · compactando em segundo plano" : "Foto adicionada") + " · " + novaFoto.etapa + garantirVisivel(novaFoto);
       }
       if (!salvarEstado()){
-        if (fotoAlterada) Object.assign(fotoAlterada, antes);
+        if (fotoAlterada){
+          for (const k of Object.keys(fotoAlterada)) delete fotoAlterada[k];
+          Object.assign(fotoAlterada, antes);
+          estado.removidos = (estado.removidos||[]).filter(r => r.id !== apagarDepois); // a lápide de um refazer que não aconteceu mataria a foto viva
+        }
         else { const p = acharParede(); if (p) p.fotos = p.fotos.filter(f=>f.id!==idGravado); }
         await idbDelete(idGravado);
         abortarLegado(); renderAmbientes();
@@ -1845,7 +1868,7 @@
       // Por isso: (1) cada arquivo leva no máximo 40 MB de mídia — passou, abre outro arquivo (parte 2, 3...);
       // (2) o arquivo é montado por pedaços, nunca numa string só; (3) vídeo acima de 15 MB fica de fora.
       const LIMITE_PARTE = 40e6, LIMITE_VIDEO = 15e6;
-      const cabecalho = JSON.stringify({ versao:3, geradoEm: new Date().toISOString(), estado });
+      const cabecalho = JSON.stringify({ versao:4, geradoEm: new Date().toISOString(), estado }); // 4: a versão antiga recusa (ela duplicaria a árvore)
       const ids = []; for (const p of todasParedes()) for (const foto of p.fotos) ids.push(foto.id);
       const partes = []; let pedacos = [], bytes = 0, primeiro = true, pulados = 0, incluidos = 0;
       const abrir = ()=>{ pedacos = [cabecalho.slice(0, -1) + ',"midiaBase64":{']; bytes = 0; primeiro = true; };
@@ -1881,89 +1904,138 @@
 
   document.getElementById("btnImportar").addEventListener("click", ()=> document.getElementById("inputImportar").click());
   document.getElementById("inputImportar").addEventListener("change", async (e)=>{
-    const file = e.target.files[0];
+    const arquivos = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file) return;
-    try{
-      const texto = await file.text();
-      const pacote = JSON.parse(texto);
-      if (pacote.versao !== 3 || !pacote.estado || !Array.isArray(pacote.estado.empreendimentos)){
-        await avisar("Backup incompatível", "Esse arquivo de backup é de uma versão antiga ou diferente do app — não dá pra importar direto aqui. Me manda que eu ajusto.");
-        return;
-      }
-      const ok = await pedirConfirmacao("Importar backup", "Isso vai SOMAR este backup ao que já está aqui (não apaga o que já existe). Continuar?", "Importar");
-      if (!ok) return;
-      const base64Map = pacote.midiaBase64 || {};
-      for (const id in base64Map){
-        const blob = dataURLToBlob(base64Map[id]);
-        await idbPut(id, blob);
-      }
-      const antesFotos = contarFotos(estado);
-      const juntados = fundirEstados(estado, sanearEstado(pacote.estado));
-      sanearEstado(estado);
-      salvarEstado();
-      renderTudo();
-      const novas = contarFotos(estado) - antesFotos;
-      if (juntados){
-        await avisar("Backup importado", novas + " registro(s) novo(s). " + juntados + " empreendimento(s) com o mesmo nome foram juntados num só (cada celular tinha criado o seu).");
-      } else {
-        toast("Backup importado");
-      }
-    }catch(err){
-      console.error(err);
-      await avisar("Erro", "Não consegui ler esse arquivo de backup.");
+    if (!arquivos.length) return;
+    const ok = await pedirConfirmacao("Importar backup", "Isso vai SOMAR " + (arquivos.length > 1 ? "estes " + arquivos.length + " arquivos" : "este backup") + " ao que já está aqui (não apaga o que já existe). Continuar?", "Importar");
+    if (!ok) return;
+    let novasTotal = 0, juntados = 0, homonimos = 0, midiasGravadas = 0; const erros = [];
+    for (let i = 0; i < arquivos.length; i++){
+      const file = arquivos[i];
+      toast("Importando " + (arquivos.length > 1 ? "parte " + (i+1) + " de " + arquivos.length : "backup") + "…");
+      try{
+        const pacote = JSON.parse(await file.text());
+        if (![3,4].includes(pacote.versao) || !pacote.estado || !Array.isArray(pacote.estado.empreendimentos)){ erros.push(file.name + ": versão incompatível"); continue; }
+        // 1) a árvore primeiro: registro sem arquivo é recuperável; arquivo sem registro vira lixo que a faxina de outra aba come
+        const antesFotos = contarFotos(estado);
+        const res = fundirEstados(estado, sanearEstado(pacote.estado));
+        sanearEstado(estado);
+        if (!salvarEstado()){ erros.push(file.name + ": sem espaço para gravar"); break; }
+        novasTotal += contarFotos(estado) - antesFotos; juntados += res.juntadosPorNome; homonimos += res.homonimos;
+        // 2) depois os arquivos, só dos registros que existem (foto com lápide ou sem registro é pulada)
+        const ids = new Set(); for (const p of todasParedes()) for (const f of p.fotos) ids.add(f.id);
+        const base64Map = pacote.midiaBase64 || {};
+        for (const id in base64Map){
+          if (!ids.has(id)) continue;
+          try{ await idbPut(id, dataURLToBlob(base64Map[id])); midiasGravadas++; }
+          catch(err){ console.error(err); erros.push("sem espaço no aparelho para os arquivos (parou depois de " + midiasGravadas + ")"); break; }
+        }
+      }catch(err){ console.error(err); erros.push(file.name + ": não consegui ler"); }
     }
+    renderTudo();
+    let msg = novasTotal + " registro(s) novo(s), " + midiasGravadas + " arquivo(s) de foto/vídeo gravado(s).";
+    if (juntados) msg += " " + juntados + " empreendimento(s) com o mesmo nome foram juntados num só.";
+    if (homonimos) msg += " " + homonimos + " ambiente(s) ou ponto(s) de nome repetido foram casados pela ordem — confira se as fotos caíram no lugar certo.";
+    if (erros.length) msg += " Problemas: " + erros.join("; ") + ".";
+    if (juntados || homonimos || erros.length || arquivos.length > 1) await avisar("Backup importado", msg); else toast("Backup importado");
   });
   const nomeNorm = (s)=> String(s||"").trim().toLowerCase();
   // casa por id; senão por NOME (versões antigas geravam id aleatório, então o "Térreo" de um celular e o do
   // outro tinham ids diferentes e a junção duplicava a árvore inteira). O i-ésimo homônimo casa com o i-ésimo.
+  const fotosDeParede = p => ((p && p.fotos)||[]).length > 0;
+  const fotosDeAmb = a => ((a && a.paredes)||[]).some(fotosDeParede);
+  const fotosDeAndar = an => ((an && an.ambientes)||[]).some(fotosDeAmb);
+  const fotosDeUnid = u => ((u && u.andares)||[]).some(fotosDeAndar);
+  let homonimosCasados = 0;
   function casar(destino, origem){
     const usados = new Set();
     return (origem||[]).map(o => {
       let d = destino.find(x => x.id === o.id && !usados.has(x));
-      if (!d) d = destino.find(x => nomeNorm(x.nome) === nomeNorm(o.nome) && !usados.has(x));
+      if (!d){
+        const nn = nomeNorm(o.nome);
+        d = destino.find(x => nomeNorm(x.nome) === nn && !usados.has(x));
+        // homônimos (dois "Quarto" no mesmo andar) casam pela ordem — pode errar o cômodo; conta para avisar
+        if (d && (destino.filter(x => nomeNorm(x.nome) === nn).length > 1 || origem.filter(x => nomeNorm(x.nome) === nn).length > 1)) homonimosCasados++;
+      }
       if (d) usados.add(d);
       return [o, d || null];
     });
   }
-  function fundirAndares(destino, origem, tomb){
-    tomb = tomb || new Set();
+  // opts.campos: a origem é MAIS NOVA (gravação de outra aba desta versão) → nome/observação/etapa dela entram
+  // nos itens casados por id. Sem opts.campos (backup, aba antiga): só acrescenta, campos ficam os nossos.
+  function fundirAndares(destino, origem, tomb, opts){
+    tomb = tomb || new Set(); opts = opts || {};
     for (const [anOrigem, anDestino] of casar(destino, origem)){
+      if (tomb.has(anOrigem.id) && !fotosDeAndar(anOrigem)) continue;
       if (!anDestino){ destino.push(anOrigem); continue; }
+      if (opts.campos && anDestino.id === anOrigem.id && anOrigem.nome) anDestino.nome = anOrigem.nome;
       // etapa: a mudança mais RECENTE vence (dois celulares podem ter mexido no mesmo andar)
       if (anOrigem.etapaAtual && (!anDestino.etapaAtual || (anOrigem.etapaTs||0) > (anDestino.etapaTs||0))){ anDestino.etapaAtual = anOrigem.etapaAtual; anDestino.etapaTs = anOrigem.etapaTs||0; }
       for (const [ambOrigem, ambDestino] of casar(anDestino.ambientes, anOrigem.ambientes)){
+        if (tomb.has(ambOrigem.id) && !fotosDeAmb(ambOrigem)) continue;
         if (!ambDestino){ anDestino.ambientes.push(ambOrigem); continue; }
+        if (opts.campos && ambDestino.id === ambOrigem.id){ if (ambOrigem.nome) ambDestino.nome = ambOrigem.nome; if (ambOrigem.observacao !== undefined) ambDestino.observacao = ambOrigem.observacao; }
         for (const [pOrigem, pDestino] of casar(ambDestino.paredes, ambOrigem.paredes)){
+          if (tomb.has(pOrigem.id) && !fotosDeParede(pOrigem)) continue;
           if (!pDestino){ ambDestino.paredes.push(pOrigem); continue; }
-          const idsExistentes = new Set(pDestino.fotos.map(f=>f.id));
-          for (const foto of pOrigem.fotos||[]) if (!idsExistentes.has(foto.id) && !tomb.has(foto.id)) pDestino.fotos.push(foto);
+          if (opts.campos && pDestino.id === pOrigem.id && pOrigem.nome) pDestino.nome = pOrigem.nome;
+          const porId = new Map(pDestino.fotos.map(f=>[f.id, f]));
+          for (const foto of pOrigem.fotos||[]){
+            if (tomb.has(foto.id)) continue;
+            const f = porId.get(foto.id);
+            if (!f){ pDestino.fotos.push(foto); continue; }
+            if (opts.campos){ if (foto.nota !== undefined) f.nota = foto.nota; if (foto.etapa !== undefined) f.etapa = foto.etapa; if (foto.cliente !== undefined) f.cliente = foto.cliente; }
+          }
         }
       }
     }
   }
+  // poda o que tem lápide — MENOS container que ganhou foto depois (a foto vence a exclusão; a lápide cai)
+  function podarLapides(st, tomb){
+    const salvos = new Set();
+    const fica = (x, temFoto) => { if (!tomb.has(x.id)) return true; if (temFoto(x)){ salvos.add(x.id); return true; } return false; };
+    for (const e of st.empreendimentos){
+      const conts = [].concat(e.unidades||[], e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]);
+      for (const c of conts) for (const an of c.andares||[]) for (const amb of an.ambientes||[]) for (const pd of amb.paredes||[]) pd.fotos = (pd.fotos||[]).filter(f => !tomb.has(f.id));
+      e.unidades = (e.unidades||[]).filter(u => fica(u, fotosDeUnid));
+      const conts2 = [].concat(e.unidades, e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]);
+      for (const c of conts2){
+        c.andares = (c.andares||[]).filter(a => fica(a, fotosDeAndar));
+        for (const an of c.andares){
+          an.ambientes = (an.ambientes||[]).filter(a => fica(a, fotosDeAmb));
+          for (const amb of an.ambientes) amb.paredes = (amb.paredes||[]).filter(p => fica(p, fotosDeParede));
+        }
+      }
+    }
+    if (salvos.size) st.removidos = (st.removidos||[]).filter(r => !salvos.has(r.id));
+  }
   // junta uma árvore inteira na nossa (backup importado, aba antiga, outra aba): só ACRESCENTA, nunca apaga
-  function fundirEstados(destino, origem){
-    let juntadosPorNome = 0;
+  function fundirEstados(destino, origem, opts){
+    opts = opts || {};
+    let juntadosPorNome = 0; homonimosCasados = 0;
     const tomb = lapides(destino, origem);
     for (const [empOrigem, empDestino] of casar(destino.empreendimentos, origem.empreendimentos)){
+      if (tomb.has(empOrigem.id)) continue;
       if (!empDestino){ destino.empreendimentos.push(empOrigem); continue; }
       if (empDestino.id !== empOrigem.id) juntadosPorNome++;
+      else if (opts.campos && empOrigem.nome) empDestino.nome = empOrigem.nome;
       for (const [unidOrigem, unidDestino] of casar(empDestino.unidades, empOrigem.unidades)){
+        if (tomb.has(unidOrigem.id) && !fotosDeUnid(unidOrigem)) continue;
         if (!unidDestino){ empDestino.unidades.push(unidOrigem); continue; }
-        fundirAndares(unidDestino.andares, unidOrigem.andares, tomb);
+        if (opts.campos && unidDestino.id === unidOrigem.id && unidOrigem.nome) unidDestino.nome = unidOrigem.nome;
+        fundirAndares(unidDestino.andares, unidOrigem.andares, tomb, opts);
       }
       for (const setor of ["areasComuns","equipamentos"]){
         if (!empOrigem[setor]) continue;
         if (!empDestino[setor]) empDestino[setor] = empOrigem[setor];
-        else fundirAndares(empDestino[setor].andares, empOrigem[setor].andares, tomb);
+        else fundirAndares(empDestino[setor].andares, empOrigem[setor].andares, tomb, opts);
       }
     }
-    // lápides se somam e valem para a árvore inteira (inclusive o que veio de fora)
+    // lápides se somam e valem para a árvore inteira: fotos E andares/ambientes/pontos/unidades excluídos
     const vistas = new Set((destino.removidos||[]).map(r=>r.id));
     for (const r of (origem.removidos||[])) if (!vistas.has(r.id)){ (destino.removidos = destino.removidos||[]).push(r); vistas.add(r.id); }
-    if (tomb.size) for (const e of destino.empreendimentos){ const conts = [].concat(e.unidades||[], e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]); for (const c of conts) for (const an of c.andares||[]) for (const amb of an.ambientes||[]) for (const pd of amb.paredes||[]) pd.fotos = (pd.fotos||[]).filter(f => !tomb.has(f.id)); }
-    return juntadosPorNome;
+    if (tomb.size) podarLapides(destino, tomb);
+    return { juntadosPorNome, homonimos: homonimosCasados };
   }
 
   renderTudo();
