@@ -55,6 +55,7 @@
   .foto-thumb{position:relative;width:74px;height:74px;border-radius:8px;overflow:hidden;background:#eee;}
   .foto-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
   .foto-thumb.video::after{content:"▶";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:20px;text-shadow:0 0 4px rgba(0,0,0,.8);}
+  .foto-thumb .compact-tag{position:absolute;left:0;right:0;bottom:22px;font-size:9px;line-height:1.2;padding:2px 3px;background:rgba(190,110,0,.85);color:#fff;text-align:center;}
   .foto-thumb .nota-dot{position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:#f1c40f;border:1px solid #fff;}
   .foto-thumb .etapa-tag{position:absolute;top:0;left:0;right:0;font-size:9px;line-height:1.2;padding:2px 3px;background:rgba(0,0,0,.55);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .foto-thumb .mini-btns{position:absolute;bottom:0;left:0;right:0;display:flex;background:rgba(0,0,0,.55);}
@@ -131,9 +132,10 @@
 <div class="ambiente-acoes" style="padding:8px 14px 0;">
   <span id="btnNovoAndar">+ Adicionar andar/setor</span>
   <span id="btnEditarAndar">✎ editar este andar</span>
+  <span id="btnEtapasPorPavimento">🏗 etapas por pavimento</span>
 </div>
 <div class="quem-row" id="etapaRow" style="display:none;">
-  Etapa atual da obra:
+  Etapa atual deste andar:
   <select id="etapaSelect"></select>
 </div>
 <div class="quem-row">
@@ -175,6 +177,7 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="progressoVideo" style="display:none;position:fixed;top:0;left:0;right:0;background:#222;color:#fff;font-size:13px;padding:10px 14px;text-align:center;z-index:80;"></div>
 
 <!-- Página inicial: escolha do modo (só aparece quando ainda não há modo salvo) -->
 <div class="modal-fundo" id="modalModo">
@@ -252,6 +255,16 @@
   </div>
 </div>
 
+<!-- Modal: etapas por pavimento -->
+<div class="modal-fundo" id="modalEtapas">
+  <div class="modal">
+    <h3>Etapas por pavimento</h3>
+    <p class="nota-modal" style="margin:0 0 6px;">Cada andar pode estar numa etapa diferente ao mesmo tempo. O que você marcar aqui vale pras fotos novas daquele andar.</p>
+    <div id="etapasLista"></div>
+    <div class="modal-acoes"><button class="confirmar" id="etapasFechar" type="button">Fechar</button></div>
+  </div>
+</div>
+
 <!-- Modal: editar andar/setor -->
 <div class="modal-fundo" id="modalAndar">
   <div class="modal">
@@ -301,7 +314,15 @@
   function etapasDoEmp(emp){ return emp && emp.tipo==="predio" ? ETAPAS_BASE.concat(ETAPAS_PREDIO_EXTRA) : ETAPAS_BASE.slice(); }
 
   // ---------- Modal genérico ----------
+  // Um modal de cada vez: um aviso vindo do segundo plano (compactação, falta de espaço) enquanto o usuário
+  // responde "Excluir?" entra em FILA — se dividissem o mesmo nó, um clique responderia às duas perguntas.
+  let filaModal = Promise.resolve();
   function modalGenerico(opts){
+    const vez = filaModal.then(()=>modalGenericoAgora(opts));
+    filaModal = vez.catch(()=>{});
+    return vez;
+  }
+  function modalGenericoAgora(opts){
     return new Promise((resolve)=>{
       document.getElementById("genTitulo").textContent = opts.titulo || "";
       const msgEl = document.getElementById("genMsg");
@@ -346,16 +367,23 @@
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
   // ---------- Moldes ----------
-  function novaParede(nome){ return { id: gerarId("pd"), nome: nome, fotos: [] }; }
-  function novoAmbiente(nome, obs, qtdParedes){
+  // Ids de fábrica DETERMINÍSTICOS (derivados da base + nome): dois celulares que montam o mesmo molde geram
+  // os mesmos ids, e a junção de backups reconhece a mesma parede em vez de duplicar a árvore inteira.
+  // Sem base (ambiente/ponto criado à mão), o id é aleatório e a junção casa por nome.
+  function slug(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,""); }
+  function idDe(prefixo, base){ return base ? (prefixo + "_" + base) : gerarId(prefixo); }
+  function novaParede(nome, base){ return { id: idDe("pd", base && (base + "_" + slug(nome))), nome: nome, fotos: [] }; }
+  function novoAmbiente(nome, obs, qtdParedes, base){
+    const b = base && (base + "_" + slug(nome));
     const paredes = [];
     const q = qtdParedes || 1;
-    if (q===1){ paredes.push(novaParede("Registro geral")); }
-    else { for (let n=1;n<=q;n++) paredes.push(novaParede("Parede "+n)); }
-    return { id: gerarId("am"), nome: nome, observacao: obs||"", paredes };
+    if (q===1){ paredes.push(novaParede("Registro geral", b)); }
+    else { for (let n=1;n<=q;n++) paredes.push(novaParede("Parede "+n, b)); }
+    return { id: idDe("am", b), nome: nome, observacao: obs||"", paredes };
   }
-  function novoAndar(nome, ambientesSpec){
-    return { id: gerarId("an"), nome: nome, ambientes: (ambientesSpec||[]).map(a => novoAmbiente(a.nome, a.obs, a.paredes)) };
+  function novoAndar(nome, ambientesSpec, base){
+    const b = base && (base + "_" + slug(nome));
+    return { id: idDe("an", b), nome: nome, etapaAtual: null, ambientes: (ambientesSpec||[]).map(a => novoAmbiente(a.nome, a.obs, a.paredes, b)) };
   }
 
   const ROOMS_CASA_PADRAO = [
@@ -371,42 +399,50 @@
     {nome:"Suíte 2",paredes:4}, {nome:"BWC 2",paredes:4}, {nome:"Varanda",paredes:4}
   ];
 
-  function moldeUnidade(tipo){
+  function moldeUnidade(tipo, base){
+    const b = base ? slug(base) : null;
     if (tipo==="terreno"){
-      return [ novoAndar("Terreno", [ {nome:"Frente"}, {nome:"Lateral Esquerda"}, {nome:"Lateral Direita"}, {nome:"Fundos"} ]) ];
+      return [ novoAndar("Terreno", [ {nome:"Frente"}, {nome:"Lateral Esquerda"}, {nome:"Lateral Direita"}, {nome:"Fundos"} ], b) ];
     }
     if (tipo==="casa"){
-      return [ novoAndar("Térreo", ROOMS_CASA_PADRAO), novoAndar("2° Pavimento", ROOMS_CASA_2PAV) ];
+      return [ novoAndar("Térreo", ROOMS_CASA_PADRAO, b), novoAndar("2° Pavimento", ROOMS_CASA_2PAV, b) ];
     }
-    return [ novoAndar("Único", ROOMS_APTO) ];
+    return [ novoAndar("Único", ROOMS_APTO, b) ];
   }
   // Prédio: só monta os NÍVEIS (subsolo, térreo, andares, cobertura). O que existe em cada nível
   // (garagem, piscina, salão...) o usuário adiciona no andar certo — não é pré-colocado no térreo.
-  function moldeAreasComuns(numSubsolos, numPavimentos, temCobertura){
+  function moldeAreasComuns(numSubsolos, numPavimentos, temCobertura, base){
+    const b = base ? slug(base) + "_comuns" : null;
     const andares = [];
     for (let i=(numSubsolos||0); i>=1; i--){
-      andares.push(novoAndar(numSubsolos===1 ? "Subsolo" : ("Subsolo "+i), [{nome:"Garagem"}]));
+      andares.push(novoAndar(numSubsolos===1 ? "Subsolo" : ("Subsolo "+i), [{nome:"Garagem"}], b));
     }
-    andares.push(novoAndar("Térreo", [{nome:"Hall de Entrada"}]));
+    andares.push(novoAndar("Térreo", [{nome:"Hall de Entrada"}], b));
     for (let i=1;i<=(numPavimentos||0);i++){
-      andares.push(novoAndar(i+"° Andar", [{nome:"Corredor"},{nome:"Hall"}]));
+      andares.push(novoAndar(i+"° Andar", [{nome:"Corredor"},{nome:"Hall"}], b));
     }
-    if (temCobertura) andares.push(novoAndar("Cobertura", []));
+    if (temCobertura) andares.push(novoAndar("Cobertura", [], b));
     return andares;
   }
-  function moldeEquipamentos(){
-    const andar = novoAndar("Equipamentos", [ {nome:"Portão"}, {nome:"Interfone"} ]);
-    andar.id = "an_equipamentos_default";
+  function moldeEquipamentos(base){
+    const b = base ? slug(base) + "_equip" : null;
+    const andar = novoAndar("Equipamentos", [ {nome:"Portão"}, {nome:"Interfone"} ], b);
+    if (!b) andar.id = "an_equipamentos_default";
     return [ andar ];
   }
 
   // ---------- IndexedDB ----------
   const DB_NAME = "obraFotosDB", STORE = "fotos";
-  function idbOpen(){
+  function idbOpen(versao){
     return new Promise((resolve,reject)=>{
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
-      req.onsuccess = () => resolve(req.result);
+      const req = versao ? indexedDB.open(DB_NAME, versao) : indexedDB.open(DB_NAME);
+      req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE); };
+      req.onsuccess = () => {
+        const db = req.result;
+        if (db.objectStoreNames.contains(STORE)){ resolve(db); return; }
+        const v = db.version + 1; db.close(); // banco existe sem a store: sobe a versão para criá-la
+        idbOpen(v).then(resolve, reject);
+      };
       req.onerror = () => reject(req.error);
     });
   }
@@ -435,6 +471,14 @@
       tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
     });
   }
+  async function idbTodasChaves(){
+    const db = await idbOpen();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(STORE,"readonly");
+      const q = tx.objectStore(STORE).getAllKeys();
+      q.onsuccess = () => resolve(q.result || []); q.onerror = () => reject(q.error);
+    });
+  }
 
   function compressImage(file, maxDim, quality){
     maxDim = maxDim || 1280; quality = quality || 0.72;
@@ -454,6 +498,351 @@
       img.src = url;
     });
   }
+  // Recomprime vídeo NO APARELHO antes de guardar (referência do Felype: WhatsApp, ~10-20 MB/min).
+  // (Rota antiga: só quando o aparelho não tem WebCodecs.) Reproduz o vídeo num canvas de até 1280 px (720p)
+  // e regrava com MediaRecorder a ~1,4 Mbps. Roda em tempo real
+  // (1 min de vídeo ≈ 1 min compactando) e precisa da tela aberta. Devolve null se o aparelho não suportar
+  // ou se o resultado não ficar menor — aí o original é usado.
+  function comprimirVideo(file, onProgress, token){
+    return new Promise((resolve)=>{
+      if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream || document.hidden){ resolve(null); return; }
+      const url = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      let finalizado = false, raf = 0, vigia = 0, tMeta = 0, rec = null, audioCtx = null, stream = null, quadros = 0, inicio = 0, semAudio = false, wakeLock = null;
+      // criado AQUI, ainda dentro do toque no botão: no iPhone um AudioContext criado depois nasce suspenso pra sempre
+      try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume().catch(()=>{}); }catch(e){ audioCtx = null; semAudio = true; }
+      // limpa TUDO em qualquer saída (sucesso, erro, vigia): loop de desenho, gravador, áudio, tracks, URL.
+      const limpar = () => {
+        cancelAnimationFrame(raf); clearInterval(vigia); clearTimeout(tMeta);
+        video.onended = null; video.onerror = null; video.onloadedmetadata = null;
+        try{ video.pause(); }catch(e){}
+        try{ if (rec && rec.state !== "inactive"){ rec.ondataavailable = null; rec.onstop = null; rec.stop(); } }catch(e){}
+        try{ if (stream) stream.getTracks().forEach(t=>t.stop()); }catch(e){}
+        try{ if (audioCtx) audioCtx.close().catch(()=>{}); }catch(e){}
+        try{ if (wakeLock) wakeLock.release().catch(()=>{}); }catch(e){}
+        try{ video.removeAttribute("src"); video.load(); }catch(e){}
+        URL.revokeObjectURL(url);
+      };
+      const terminar = (valor) => { if (finalizado) return; finalizado = true; limpar(); resolve(valor); };
+      const falhar = () => terminar(null);
+      video.onerror = falhar;
+      tMeta = setTimeout(falhar, 15000); // metadados que nunca chegam (arquivo estranho) — não trava
+      video.onloadedmetadata = async () => {
+        clearTimeout(tMeta);
+        try{
+          try{ video.pause(); video.currentTime = 0; }catch(e){}
+          const dur = video.duration;
+          if (!isFinite(dur) || dur <= 0){ falhar(); return; }
+          if (!video.videoWidth || !video.videoHeight){ falhar(); return; } // sem dimensão real: nunca gerar canvas 2x2 "menor"
+          try{ if (navigator.wakeLock && navigator.wakeLock.request) wakeLock = await navigator.wakeLock.request("screen"); }catch(e){ wakeLock = null; } // segura a tela acesa enquanto compacta
+          const MAX = 1280;
+          const escala = Math.min(1, MAX / Math.max(video.videoWidth||1, video.videoHeight||1));
+          const w = Math.max(2, Math.round(video.videoWidth*escala/2)*2), h = Math.max(2, Math.round(video.videoHeight*escala/2)*2);
+          const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          stream = canvas.captureStream(30);
+          try{
+            if (!audioCtx) throw new Error("sem AudioContext");
+            const src = audioCtx.createMediaElementSource(video);
+            const dest = audioCtx.createMediaStreamDestination();
+            src.connect(dest);
+            dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+            if (audioCtx.state === "suspended"){ try{ await audioCtx.resume(); }catch(e){} }
+            if (audioCtx.state !== "running") semAudio = true;
+          }catch(e){ semAudio = true; }
+          const tipos = ["video/mp4;codecs=avc1","video/mp4","video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"];
+          const mime = tipos.find(m => MediaRecorder.isTypeSupported(m)) || "";
+          rec = new MediaRecorder(stream, Object.assign({ videoBitsPerSecond: 1400000, audioBitsPerSecond: 64000 }, mime ? {mimeType: mime} : {}));
+          const chunks = [];
+          rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+          rec.onstop = () => {
+            if (finalizado) return;
+            const out = new Blob(chunks, {type: mime || "video/webm"});
+            // Portão de qualidade: só aceita se DE FATO desenhou quadros (≥ 12 por segundo de vídeo) e em
+            // tempo razoável (≤ 2,5x a duração). Aba oculta/tela apagada congela o canvas e produziria um
+            // "vídeo" menor porém vazio — nesse caso devolve null e o original é preservado.
+            const fpsMedio = quadros / dur, tempoReal = (Date.now() - inicio) / 1000;
+            const bom = out.size > 0 && out.size < file.size && fpsMedio >= 12 && tempoReal <= dur * 2.5 + 3;
+            if (bom) out.semAudio = semAudio || (audioCtx && audioCtx.state !== "running");
+            terminar(bom ? out : null);
+          };
+          let ultimoTempo = -1, paradoDesde = Date.now();
+          const desenhar = () => {
+            if (finalizado) return;
+            ctx.drawImage(video, 0, 0, w, h); quadros++;
+            if (onProgress) onProgress(Math.min(1, video.currentTime / dur));
+            if (!video.ended) raf = requestAnimationFrame(desenhar);
+          };
+          video.onended = () => { cancelAnimationFrame(raf); clearInterval(vigia); try{ ctx.drawImage(video, 0, 0, w, h); }catch(e){} setTimeout(()=>{ try{ rec.stop(); }catch(e){ falhar(); } }, 200); };
+          // vigia: aba/tela escondida ou reprodução parada por 8 s → desiste (o original é salvo).
+          vigia = setInterval(() => {
+            if (finalizado){ clearInterval(vigia); return; }
+            if (document.hidden || (token && token.cancelado)){ falhar(); return; }
+            if (video.currentTime !== ultimoTempo){ ultimoTempo = video.currentTime; paradoDesde = Date.now(); if (onProgress) onProgress(Math.min(1, video.currentTime / dur)); }
+            else if (Date.now() - paradoDesde > 8000){ falhar(); }
+          }, 500);
+          inicio = Date.now();
+          rec.start(500);
+          try { await video.play(); }
+          catch(e){ video.muted = true; semAudio = true; try { await video.play(); } catch(e2){ falhar(); return; } }
+          desenhar();
+        }catch(e){ falhar(); }
+      };
+      video.playsInline = true; video.preload = "auto"; video.src = url;
+      // play() dentro do gesto: autoriza o elemento a tocar depois sem gesto (iPhone); é pausado ao carregar os metadados
+      try{ const p = video.play(); if (p && p.catch) p.catch(()=>{}); }catch(e){}
+    });
+  }
+  function mostrarProgressoVideo(p, restantes, legado){ const el = document.getElementById("progressoVideo"); el.style.display = "block"; el.textContent = "Compactando vídeo… " + Math.round((p||0)*100) + "%" + (restantes ? " · mais " + restantes + " na fila" : "") + (legado ? " — mantém o app aberto" : " — pode continuar usando o app"); }
+  function esconderProgressoVideo(){ document.getElementById("progressoVideo").style.display = "none"; }
+  // ---------- Compressão RÁPIDA de vídeo (WebCodecs, num worker) ----------
+  // Usa o decodificador/codificador de HARDWARE do celular: 1080p → 720p, H.264 ~1,4 Mbps, áudio AAC 96 kbps
+  // (ou copiado como está). Roda num worker, bem mais rápido que tempo real; a fila segura a tela acesa só
+  // enquanto roda (segundos) e, se o celular congelar o app no meio, o que ficou marcado retoma na próxima abertura.
+  // O original é salvo ANTES; se der qualquer coisa errada, o original fica. Sem WebCodecs → rota antiga (canvas).
+  const VIDEO_RAPIDO_OK = !!(window.Worker && window.VideoEncoder && window.VideoDecoder && window.OffscreenCanvas);
+  const CODIGO_WORKER_VIDEO = [
+'self.onmessage = function(e){',
+'  var m = e.data;',
+'  if (m && m.tipo === "ping"){ postMessage({tipo:"pong"}); return; }',
+'  iniciar(m);',
+'};',
+'async function iniciar(m){',
+'  try{',
+'    importScripts(m.libMp4box, m.libMuxer);',
+'    var r = await transcodificar(m.file, m, function(p){ postMessage({tipo:"progresso", p:p}); });',
+'    postMessage({tipo:"fim", ok:true, buffer:r.buffer, info:r.info}, [r.buffer]);',
+'  }catch(err){ postMessage({tipo:"fim", ok:false, erro:String(err && err.message || err)}); }',
+'}',
+'function descricaoVideo(entry){',
+'  var box = entry.avcC || entry.hvcC || entry.vpcC || entry.av1C;',
+'  if (!box) return null;',
+'  var s = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);',
+'  box.write(s);',
+'  return new Uint8Array(s.buffer, 8);',
+'}',
+'function descricaoAudio(entry){ try{ return entry.esds.esd.descs[0].descs[0].data; }catch(e){ return null; } }',
+'function rotacaoDe(matrix){',
+'  if (!matrix || matrix.length < 5) return 0;',
+'  var a = matrix[0]/65536, b = matrix[1]/65536;',
+'  var ang = Math.round(Math.atan2(b, a) * 180 / Math.PI);',
+'  var r = ((ang % 360) + 360) % 360;',
+'  return (r===90||r===180||r===270) ? r : 0;',
+'}',
+'async function lerBoxes(file){',
+'  var boxes = [], pos = 0;',
+'  while (pos + 8 <= file.size){',
+'    var h = new DataView(await file.slice(pos, Math.min(pos+16, file.size)).arrayBuffer());',
+'    var size = h.getUint32(0), hdr = 8;',
+'    var type = String.fromCharCode(h.getUint8(4),h.getUint8(5),h.getUint8(6),h.getUint8(7));',
+'    if (size === 1){ if (h.byteLength < 16) break; size = Number(h.getBigUint64(8)); hdr = 16; }',
+'    else if (size === 0){ size = file.size - pos; }',
+'    if (size < hdr) break;',
+'    boxes.push({type:type, start:pos, size:size, hdr:hdr});',
+'    pos += size;',
+'  }',
+'  return boxes;',
+'}',
+'function dormir(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }',
+'async function transcodificar(file, opt, onProgress){',
+'  var mp4 = MP4Box.createFile();',
+'  var info = null;',
+'  var prontoP = new Promise(function(res, rej){ mp4.onReady = function(i){ info = i; res(i); }; mp4.onError = function(e){ rej(new Error("mp4box: " + e)); }; });',
+'  var FATIA = 4*1024*1024;',
+'  async function anexar(ini, fim){ var buf = await file.slice(ini, fim).arrayBuffer(); buf.fileStart = ini; mp4.appendBuffer(buf); }',
+'  var boxes = await lerBoxes(file);',
+'  var moov = boxes.filter(function(b){ return b.type==="moov"; })[0];',
+'  var mdat = boxes.filter(function(b){ return b.type==="mdat"; })[0];',
+'  if (!moov || !mdat) throw new Error("arquivo sem moov/mdat (nao e MP4/MOV)");',
+'  var inicioCorpo = mdat.start + mdat.hdr;',
+'  await anexar(0, inicioCorpo);',
+'  var fimCorpo = file.size;',
+'  if (moov.start > mdat.start){ await anexar(moov.start, moov.start + moov.size); fimCorpo = moov.start; }',
+'  await Promise.race([prontoP, dormir(6000).then(function(){ throw new Error("moov nao lido a tempo"); })]);',
+'  var tv = info.videoTracks && info.videoTracks[0];',
+'  if (!tv) throw new Error("sem trilha de video");',
+'  var ta = (info.audioTracks && info.audioTracks[0]) || null;',
+'  // trilha de som que o mp4box nao reconhece (ex.: PCM de camera/editor) nao entra em audioTracks — mas existe,',
+'  // e o usuario precisa saber que o compactado ficou mudo: olha o handler "soun" direto nas trilhas',
+'  var temTrilhaSom = !!ta;',
+'  try{ (mp4.moov.traks || []).forEach(function(tr){ if (tr.mdia && tr.mdia.hdlr && tr.mdia.hdlr.handler === "soun") temTrilhaSom = true; }); }catch(e){}',
+'  var entV = mp4.getTrackById(tv.id).mdia.minf.stbl.stsd.entries[0];',
+'  var descV = descricaoVideo(entV);',
+'  var rot = rotacaoDe(tv.matrix);',
+'  var W = tv.video.width, H = tv.video.height;',
+'  if (!W || !H) throw new Error("video sem dimensao");',
+'  var escala = Math.min(1, opt.maxDim / Math.max(W, H));',
+'  var w2 = Math.max(2, Math.round(W*escala/2)*2), h2 = Math.max(2, Math.round(H*escala/2)*2);',
+'  var dur = tv.duration / tv.timescale;',
+'  var fps = Math.min(60, Math.max(10, Math.round(tv.nb_samples / (dur || 1)))) || 30;',
+'  var hw = opt.hw || "no-preference";',
+'  var cfgDec = { codec: tv.codec, codedWidth: W, codedHeight: H, hardwareAcceleration: hw };',
+'  if (descV) cfgDec.description = descV;',
+'  var supDec = await VideoDecoder.isConfigSupported(cfgDec);',
+'  if (!supDec.supported) throw new Error("aparelho nao decodifica " + tv.codec);',
+'  var cfgEnc = null, cands = ["avc1.640028","avc1.4D0028","avc1.42E028","avc1.42001f"];',
+'  for (var i=0;i<cands.length;i++){',
+'    var cand = { codec: cands[i], width: w2, height: h2, bitrate: opt.bitrate, framerate: fps, latencyMode: "quality", bitrateMode: "variable", avc: { format: "avc" }, hardwareAcceleration: hw };',
+'    try{ var s = await VideoEncoder.isConfigSupported(cand); if (s.supported){ cfgEnc = cand; break; } }catch(e){}',
+'  }',
+'  if (!cfgEnc) throw new Error("codificador H.264 indisponivel");',
+'  var modoAudio = "nenhum", cfgADec = null, cfgAEnc = null, descA = null;',
+'  if (ta){',
+'    var entA = mp4.getTrackById(ta.id).mdia.minf.stbl.stsd.entries[0];',
+'    descA = descricaoAudio(entA);',
+'    if (/^mp4a/.test(ta.codec) && descA && ta.audio && ta.audio.sample_rate && ta.audio.channel_count){',
+'      modoAudio = "copiado";',
+'      if (ta.bitrate > 128000 && self.AudioDecoder && self.AudioEncoder){',
+'        var cd = { codec: ta.codec, sampleRate: ta.audio.sample_rate, numberOfChannels: ta.audio.channel_count, description: descA };',
+'        var ce = { codec: "mp4a.40.2", sampleRate: ta.audio.sample_rate, numberOfChannels: ta.audio.channel_count, bitrate: 96000 };',
+'        try{ var sa = await AudioDecoder.isConfigSupported(cd), sb = await AudioEncoder.isConfigSupported(ce); if (sa.supported && sb.supported){ cfgADec = cd; cfgAEnc = ce; modoAudio = "recomprimido"; } }catch(e){}',
+'      }',
+'    }',
+'  }',
+'  var muxOpt = { target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: "avc", width: w2, height: h2, rotation: rot }, fastStart: "in-memory", firstTimestampBehavior: "cross-track-offset" };',
+'  if (modoAudio !== "nenhum") muxOpt.audio = { codec: "aac", numberOfChannels: ta.audio.channel_count, sampleRate: ta.audio.sample_rate };',
+'  var muxer = new Mp4Muxer.Muxer(muxOpt);',
+'  var falha = null;',
+'  function marcarFalha(e){ if (!falha) falha = (e instanceof Error) ? e : new Error(String(e && e.message || e)); }',
+'  var canvas = (w2 !== W || h2 !== H) ? new OffscreenCanvas(w2, h2) : null;',
+'  var ctx = canvas ? canvas.getContext("2d", { alpha: false }) : null;',
+'  var nQuadro = 0;',
+'  var enc = new VideoEncoder({ output: function(chunk, meta){ try{ muxer.addVideoChunk(chunk, meta); }catch(e){ marcarFalha(e); } }, error: marcarFalha });',
+'  enc.configure(cfgEnc);',
+'  var dec = new VideoDecoder({ output: function(frame){',
+'    try{',
+'      var f = frame;',
+'      if (canvas){ ctx.drawImage(frame, 0, 0, w2, h2); var init = { timestamp: frame.timestamp }; if (frame.duration != null) init.duration = frame.duration; f = new VideoFrame(canvas, init); frame.close(); }',
+'      enc.encode(f, { keyFrame: (nQuadro % (fps*2)) === 0 }); nQuadro++;',
+'      f.close();',
+'    }catch(e){ marcarFalha(e); try{ frame.close(); }catch(_){} }',
+'  }, error: marcarFalha });',
+'  dec.configure(cfgDec);',
+'  var adec = null, aenc = null;',
+'  if (modoAudio === "recomprimido"){',
+'    aenc = new AudioEncoder({ output: function(chunk, meta){ try{ muxer.addAudioChunk(chunk, meta); }catch(e){ marcarFalha(e); } }, error: marcarFalha });',
+'    aenc.configure(cfgAEnc);',
+'    adec = new AudioDecoder({ output: function(data){ try{ aenc.encode(data); }catch(e){ marcarFalha(e); } finally{ data.close(); } }, error: marcarFalha });',
+'    adec.configure(cfgADec);',
+'  }',
+'  var metaCopia = ta ? { decoderConfig: { codec: ta.codec, sampleRate: ta.audio.sample_rate, numberOfChannels: ta.audio.channel_count, description: descA } } : null;',
+'  var filaV = [], filaA = [], totalV = tv.nb_samples || 1, feitosV = 0, ultimoV = 0, ultimoA = 0, primeiroA = true;',
+'  mp4.onSamples = function(id, user, samples){ for (var k=0;k<samples.length;k++){ var s = samples[k]; if (id === tv.id) filaV.push(s); else if (ta && id === ta.id) filaA.push(s); } };',
+'  mp4.setExtractionOptions(tv.id, null, { nbSamples: 60 });',
+'  if (ta && modoAudio !== "nenhum") mp4.setExtractionOptions(ta.id, null, { nbSamples: 200 });',
+'  mp4.start();',
+'  function us(v, ts){ return Math.round(v * 1e6 / ts); }',
+'  async function drenar(){',
+'    while ((filaV.length || filaA.length) && !falha){',
+'      while (filaA.length && !falha){',
+'        var sa2 = filaA.shift(); var t = us(sa2.cts, sa2.timescale), d = us(sa2.duration, sa2.timescale);',
+'        if (adec) adec.decode(new EncodedAudioChunk({ type: "key", timestamp: t, duration: d, data: sa2.data }));',
+'        else muxer.addAudioChunkRaw(sa2.data, "key", t, d, primeiroA ? metaCopia : undefined);',
+'        primeiroA = false; ultimoA = sa2.number + 1;',
+'      }',
+'      if (!filaV.length) break;',
+'      if (dec.decodeQueueSize > 4 || enc.encodeQueueSize > 4 || (adec && adec.decodeQueueSize > 40)){ await dormir(4); continue; }',
+'      var sv = filaV.shift();',
+'      dec.decode(new EncodedVideoChunk({ type: sv.is_sync ? "key" : "delta", timestamp: us(sv.cts, sv.timescale), duration: us(sv.duration, sv.timescale), data: sv.data }));',
+'      feitosV++; ultimoV = sv.number + 1;',
+'      if ((feitosV & 7) === 0) onProgress(feitosV / totalV);',
+'    }',
+'    try{ if (ultimoV) mp4.releaseUsedSamples(tv.id, ultimoV); if (ta && ultimoA) mp4.releaseUsedSamples(ta.id, ultimoA); }catch(e){}',
+'    if (falha) throw falha;',
+'  }',
+'  var pos = inicioCorpo;',
+'  while (pos < fimCorpo && !falha){ var fim = Math.min(pos + FATIA, fimCorpo); await anexar(pos, fim); pos = fim; await drenar(); }',
+'  mp4.flush(); await drenar();',
+'  if (falha) throw falha;',
+'  if (!feitosV) throw new Error("nenhum quadro extraido");',
+'  await dec.flush(); await enc.flush();',
+'  if (adec){ await adec.flush(); await aenc.flush(); }',
+'  if (falha) throw falha;',
+'  muxer.finalize();',
+'  var buffer = muxer.target.buffer;',
+'  return { buffer: buffer, info: { largura: w2, altura: h2, rotacao: rot, audio: modoAudio, tinhaAudio: temTrilhaSom, quadros: nQuadro, fps: fps } };',
+'}'
+  ].join("\n");
+  let workerVideoUrl = null;
+  function comprimirVideoRapido(blob, onProgress, opcoes){
+    return new Promise((resolve)=>{
+      if (!VIDEO_RAPIDO_OK){ resolve(null); return; }
+      try{
+        if (!workerVideoUrl) workerVideoUrl = URL.createObjectURL(new Blob([CODIGO_WORKER_VIDEO], {type:"text/javascript"}));
+        const w = new Worker(workerVideoUrl);
+        let vivo = true, vigia = 0;
+        const fim = (v)=>{ if (!vivo) return; vivo = false; clearTimeout(vigia); try{ w.terminate(); }catch(e){} resolve(v); };
+        // vigia: 90 s sem notícia → pergunta se o worker está vivo (a aba pode ter ficado congelada com a tela
+        // apagada e acabado de voltar); só desiste se ele não responder em 15 s
+        const desistir = ()=>{ console.warn("compressão rápida: worker sem resposta — desistindo"); fim(null); };
+        const armar = ()=>{ clearTimeout(vigia); vigia = setTimeout(()=>{ try{ w.postMessage({tipo:"ping"}); }catch(e){} vigia = setTimeout(desistir, 15000); }, 90000); };
+        w.onmessage = (e)=>{
+          const m = e.data;
+          if (m.tipo === "pong"){ armar(); return; }
+          if (m.tipo === "progresso"){ armar(); if (onProgress) onProgress(m.p); return; }
+          if (m.tipo === "fim"){
+            if (m.ok && m.buffer && m.buffer.byteLength > 0 && m.buffer.byteLength < blob.size){
+              const out = new Blob([m.buffer], {type:"video/mp4"}); out.info = m.info;
+              out.semAudio = !!(m.info && m.info.tinhaAudio && m.info.audio === "nenhum"); // tinha som e ficou mudo: o usuário decide
+              fim(out);
+            }
+            else { if (!m.ok) console.warn("compressão rápida falhou:", m.erro); else console.warn("compressão rápida: saída não ficou menor — fica o original"); fim(null); }
+          }
+        };
+        w.onerror = (e)=>{ console.warn("worker de vídeo:", e && e.message); fim(null); };
+        armar();
+        w.postMessage(Object.assign({ file: blob, libMp4box: new URL("lib/mp4box.all.min.js", location.href).href, libMuxer: new URL("lib/mp4-muxer.min.js", location.href).href, maxDim: 1280, bitrate: 1400000 }, opcoes || {}));
+      }catch(e){ console.warn(e); resolve(null); }
+    });
+  }
+  function mb(n){ return (n/1e6).toFixed(n < 20e6 ? 1 : 0) + " MB"; } // MB decimal, como a galeria do celular mostra
+  // ---------- Fila de compactação em segundo plano ----------
+  // O vídeo entra na árvore com o ORIGINAL já gravado e a marca compactando=true; a fila troca o arquivo
+  // pelo compactado quando termina (ou tira a marca e deixa o original, se não der). Sobrevive a fechar o app:
+  // ao abrir de novo, o que ficou marcado volta pra fila.
+  const filaCompact = []; let compactandoAgora = false;
+  function acharFotoPorId(id){ for (const p of todasParedes()){ const f = p.fotos.find(x=>x.id===id); if (f) return f; } return null; }
+  function agendarCompactacao(fotoId, arquivo, promessaLegada){ filaCompact.push({fotoId, arquivo, promessaLegada}); processarFilaCompact(); }
+  async function processarFilaCompact(){
+    if (compactandoAgora) return; compactandoAgora = true;
+    let trava = null; // segura a tela acesa só enquanto a fila roda (segundos); solta no fim
+    try{ if (navigator.wakeLock && navigator.wakeLock.request) trava = await navigator.wakeLock.request("screen"); }catch(e){ trava = null; }
+    try{ while (filaCompact.length){ const job = filaCompact.shift(); try{ await compactarUm(job); }catch(e){ console.error(e); } } }
+    finally{ compactandoAgora = false; esconderProgressoVideo(); try{ if (trava) trava.release().catch(()=>{}); }catch(e){} }
+  }
+  async function compactarUm(job){
+    const foto = acharFotoPorId(job.fotoId);
+    if (!foto || !foto.compactando) return; // apagada ou refeita antes de chegar a vez
+    if (foto.comprimido){ foto.compactando = false; salvarEstado(); renderAmbientes(); return; } // marca voltou por engano: já está compactado
+    const original = job.arquivo || await idbGet(job.fotoId);
+    if (!original){ foto.compactando = false; salvarEstado(); renderAmbientes(); return; }
+    const legado = !!job.promessaLegada;
+    const rotulo = (p)=> mostrarProgressoVideo(p, filaCompact.length, legado);
+    let out = null;
+    try{
+      rotulo(0);
+      if (legado) out = await job.promessaLegada;
+      else out = await comprimirVideoRapido(original, rotulo);
+      if (out && out.semAudio){
+        const mudo = await pedirConfirmacao("Vídeo ficou sem som", "O celular não deixou copiar o áudio: o vídeo compactado ficou MUDO (" + mb(out.size) + "). Salvar assim, sem som? Se cancelar, fica o original com som (" + mb(original.size) + ").", "Salvar sem som");
+        if (!mudo) out = null;
+      }
+    }catch(e){ console.warn(e); out = null; }
+    const atual = acharFotoPorId(job.fotoId);
+    if (!atual || !atual.compactando) return; // apagada no meio: não grava nada por cima
+    // a marca sai ANTES de gravar: se o app morrer entre os dois passos, fica o original sem marca
+    // (nunca recomprime um arquivo já comprimido); se a gravação falhar por falta de espaço, também fica o original
+    atual.compactando = false; atual.tamanho = original.size;
+    salvarEstado();
+    let nota;
+    if (out){
+      try{ await idbPut(job.fotoId, out); atual.tamanho = out.size; atual.comprimido = true; salvarEstado(); nota = mb(original.size) + " → " + mb(out.size) + (out.semAudio ? " (sem som)" : ""); }
+      catch(e){ console.error(e); out = null; nota = "sem espaço pra gravar o compactado — ficou o original (" + mb(original.size) + ")"; }
+    } else nota = "ficou no original (" + mb(original.size) + ")";
+    toast(out ? ("Vídeo compactado · " + nota) : ("Vídeo salvo sem compactar · " + nota));
+    renderAmbientes();
+  }
+
   function blobToDataURL(blob){
     return new Promise((resolve,reject)=>{
       const r = new FileReader();
@@ -472,12 +861,14 @@
   }
 
   // ---------- Estado ----------
-  const LS_KEY = "obraFotosEstado_v3";
+  // A versão nova grava na SUA chave. Uma aba com a versão antiga (mesma chave v3, sem aviso de outra aba)
+  // gravava por cima do que a nova tinha feito e apagava fotos; agora o que ela escreve só é ABSORVIDO.
+  const LS_KEY = "obraFotosEstado_v4", LS_KEY_ANTIGA = "obraFotosEstado_v3", LS_REV = "obraFotosRevisao";
   function estadoPadrao(){
     return { empreendimentos: [
       { id: "emp_serena_essence_default", nome: "Residencial Serena Essence", tipo:"casa",
-        unidades: [ { id: "un_serena_unidade1_default", nome: "Unidade 1", andares: moldeUnidade("casa") } ],
-        areasComuns: null, equipamentos: { andares: moldeEquipamentos() } }
+        unidades: [ { id: "un_serena_unidade1_default", nome: "Unidade 1", andares: moldeUnidade("casa", "un_serena_unidade1_default") } ],
+        areasComuns: null, equipamentos: { andares: moldeEquipamentos("emp_serena_essence_default") } }
     ]};
   }
   function sanearEstado(st){
@@ -485,25 +876,112 @@
       e.unidades = Array.isArray(e.unidades) ? e.unidades : [];
       e.unidades.forEach(u => { u.andares = Array.isArray(u.andares) ? u.andares : []; });
       if (e.areasComuns && !Array.isArray(e.areasComuns.andares)) e.areasComuns.andares = [];
-      if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0,0,false) };
+      if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0,0,false, e.id) };
       if (e.equipamentos && !Array.isArray(e.equipamentos.andares)) e.equipamentos.andares = [];
-      if (!e.equipamentos && (e.tipo==="casa"||e.tipo==="predio")) e.equipamentos = { andares: moldeEquipamentos() };
+      if (!e.equipamentos && (e.tipo==="casa"||e.tipo==="predio")) e.equipamentos = { andares: moldeEquipamentos(e.id) };
       return e;
     });
     return st;
   }
+  // LÁPIDES: id de foto excluída/refeita fica anotado na árvore; a junção (outra aba, backup, aba antiga)
+  // nunca ressuscita um registro com lápide — antes, um backup antigo trazia a foto apagada de volta.
+  function marcarRemovido(id){
+    if (!Array.isArray(estado.removidos)) estado.removidos = [];
+    estado.removidos.push({ id, ts: Date.now() });
+    const limite = Date.now() - 180*24*3600*1000;
+    estado.removidos = estado.removidos.filter(r => r.ts > limite).slice(-2000);
+  }
+  function lapides(...sts){ const t = new Set(); for (const st of sts) for (const r of (st && st.removidos) || []) t.add(r.id); return t; }
+  function contarFotos(st){ let n = 0; for (const e of st.empreendimentos||[]){ const conts = [].concat(e.unidades||[], e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]); for (const c of conts) for (const an of c.andares||[]) for (const amb of an.ambientes||[]) for (const p of amb.paredes||[]) n += (p.fotos||[]).length; } return n; }
   function carregarEstado(){
     try{
-      const raw = localStorage.getItem(LS_KEY);
+      let raw = localStorage.getItem(LS_KEY);
+      if (!raw) raw = localStorage.getItem(LS_KEY_ANTIGA); // primeira abertura desta versão: parte do que a antiga gravou
       if (!raw) return estadoPadrao();
       const st = sanearEstado(JSON.parse(raw));
       if (!st.empreendimentos.length) return estadoPadrao();
+      if (typeof st.revisao !== "number") st.revisao = 0;
       return st;
     }catch(e){ console.error("estado corrompido, recomecando", e); return estadoPadrao(); }
   }
-  function salvarEstado(){ localStorage.setItem(LS_KEY, JSON.stringify(estado)); }
+  function salvarEstado(){
+    try{
+      // outra aba desta versão gravou depois de nós carregarmos e o aviso ainda não chegou: junta antes de gravar por cima
+      const revDisco = parseInt(localStorage.getItem(LS_REV)||"0", 10) || 0;
+      if (revDisco > (estado.revisao||0)){
+        try{ const outro = sanearEstado(JSON.parse(localStorage.getItem(LS_KEY))); fundirEstados(estado, outro); }catch(e){}
+        estado.revisao = revDisco;
+      }
+      estado.revisao = (estado.revisao||0) + 1;
+      localStorage.setItem(LS_REV, String(estado.revisao)); // revisão antes da árvore: quem receber o aviso da árvore já vê a revisão nova
+      localStorage.setItem(LS_KEY, JSON.stringify(estado));
+      return true;
+    }catch(e){
+      console.error(e);
+      avisar("Sem espaço no aparelho", "Não consegui gravar as alterações — o armazenamento do celular está cheio. Apague fotos/vídeos antigos ou exporte um backup e limpe. A última ação NÃO foi salva.");
+      return false;
+    }
+  }
+  // memória volta a ser o que está gravado (depois de uma gravação que falhou)
+  function reverterParaDisco(){ estado = carregarEstado(); renderTudo(); }
+  // o que uma aba com a versão ANTIGA gravou (fotos novas) entra aqui; nunca substitui a árvore desta versão
+  function absorverChaveAntiga(){
+    try{
+      const raw = localStorage.getItem(LS_KEY_ANTIGA); if (!raw) return 0;
+      const assinatura = raw.length + ":" + raw.slice(-160);
+      if (localStorage.getItem("obraFotosV3Absorvido") === assinatura) return 0;
+      const velho = sanearEstado(JSON.parse(raw));
+      const antes = contarFotos(estado);
+      fundirEstados(estado, velho);
+      localStorage.setItem("obraFotosV3Absorvido", assinatura);
+      const ganho = contarFotos(estado) - antes;
+      if (ganho > 0) salvarEstado();
+      return ganho;
+    }catch(e){ console.warn("absorção da chave antiga falhou", e); return 0; }
+  }
 
   let estado = carregarEstado();
+  // pede armazenamento persistente (no iPhone, sem isso o navegador pode apagar tudo após dias sem uso)
+  try{ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
+  // versão anterior guardava a etapa por empreendimento no aparelho; agora é por andar, na árvore
+  (function migrarEtapaAntiga(){
+    const raw = localStorage.getItem("obraFotosEtapaAtual");
+    if (raw === null) return;
+    let mapa = {}; try{ mapa = JSON.parse(raw) || {}; }catch(e){}
+    let migrados = 0;
+    for (const emp of estado.empreendimentos){
+      const etapa = mapa[emp.id]; if (!etapa) continue;
+      const andares = [].concat(emp.areasComuns ? emp.areasComuns.andares : [], ...emp.unidades.map(u=>u.andares), emp.equipamentos ? emp.equipamentos.andares : []);
+      for (const an of andares){ if (!an.etapaAtual){ an.etapaAtual = etapa; an.etapaTs = 0; migrados++; } }
+    }
+    localStorage.removeItem("obraFotosEtapaAtual");
+    if (migrados){ salvarEstado(); setTimeout(()=>toast("Etapa antiga aplicada a " + migrados + " andar(es) — agora ela é por andar, ajuste em 'etapas por pavimento'"), 900); }
+  })();
+  absorverChaveAntiga();
+  // outra aba do app gravou: recarrega em vez de sobrescrever o que ela fez
+  window.addEventListener("storage", (e)=>{
+    if (e.key === LS_KEY_ANTIGA && e.newValue){
+      const ganho = absorverChaveAntiga();
+      if (ganho > 0){ renderTudo(); toast(ganho + " foto(s) vindas de uma aba com a versão antiga do app — feche e reabra aquela aba"); }
+      return;
+    }
+    if (e.key !== LS_KEY || !e.newValue) return;
+    // a revisão vem do PRÓPRIO valor gravado (a chave separada pode ainda não ter chegado nesta aba)
+    let revDeles = 0; try{ revDeles = JSON.parse(e.newValue).revisao || 0; }catch(_){}
+    const revDisco = Math.max(revDeles, parseInt(localStorage.getItem(LS_REV)||"0", 10) || 0);
+    if (revDisco <= (estado.revisao||0)) return; // o que está no disco já é o nosso
+    // UNIÃO, não troca: duas abas gravando quase juntas podem ter se atropelado (a leitura da revisão não é
+    // atômica entre abas); o que esta aba tem e a outra não viu entra na árvore dela — lápides impedem
+    // que exclusão volte. Se a união trouxe algo nosso, grava de novo para as abas convergirem.
+    const deles = carregarEstado();
+    const antesUniao = JSON.stringify(deles);
+    fundirEstados(deles, estado);
+    estado = deles;
+    if (!getEmp(empAtualId)){ empAtualId = estado.empreendimentos[0].id; unidAtualId = contextoPadrao(getEmp(empAtualId)); andarAtualId = null; }
+    else if (!getUnidadeOuComum()){ unidAtualId = contextoPadrao(getEmp(empAtualId)); andarAtualId = null; }
+    if (JSON.stringify(estado) !== antesUniao) salvarEstado();
+    renderTudo(); toast("Dados atualizados por outra aba do app");
+  });
   let empAtualId = estado.empreendimentos[0].id;
   let unidAtualId = null;
   let andarAtualId = null;
@@ -513,14 +991,13 @@
   // modo (construção/manutenção) e etapa atual por empreendimento — preferências, fora da árvore
   let modo = localStorage.getItem("obraFotosModo") || null;
   let filtroEtapa = "__todas__";
-  function etapaAtualDe(empId){ try{ return (JSON.parse(localStorage.getItem("obraFotosEtapaAtual")||"{}"))[empId] || null; }catch(e){ return null; } }
-  function setEtapaAtual(empId, etapa){ let m={}; try{ m = JSON.parse(localStorage.getItem("obraFotosEtapaAtual")||"{}"); }catch(e){} m[empId]=etapa; localStorage.setItem("obraFotosEtapaAtual", JSON.stringify(m)); }
+  // etapa é POR ANDAR (Felype 10/09: num prédio cada pavimento está numa etapa diferente) — vive na
+  // árvore (andar.etapaAtual), então exporta/importa/sincroniza; não é preferência do aparelho.
   function etapaParaNovaFoto(){
     if (modo==="manutencao") return ETAPA_MANUTENCAO;
-    const emp = getEmp(empAtualId);
-    const lista = etapasDoEmp(emp);
-    const salva = etapaAtualDe(empAtualId);
-    return (salva && lista.includes(salva)) ? salva : lista[0];
+    const lista = etapasDoEmp(getEmp(empAtualId));
+    const an = getAndarAtual();
+    return (an && an.etapaAtual && lista.includes(an.etapaAtual)) ? an.etapaAtual : lista[0];
   }
   function fotosVisiveis(p){
     if (filtroEtapa==="__todas__") return p.fotos;
@@ -578,7 +1055,8 @@
     const etapaSel = document.getElementById("etapaSelect");
     etapaSel.innerHTML = "";
     for (const et of etapas){ const o = document.createElement("option"); o.value = et; o.textContent = et; etapaSel.appendChild(o); }
-    etapaSel.value = etapaParaNovaFoto()===ETAPA_MANUTENCAO ? etapas[0] : etapaParaNovaFoto();
+    const andarSel = getAndarAtual();
+    etapaSel.value = (andarSel && andarSel.etapaAtual && etapas.includes(andarSel.etapaAtual)) ? andarSel.etapaAtual : etapas[0];
     const filtroSel = document.getElementById("filtroEtapaSelect");
     filtroSel.innerHTML = "";
     const opcoes = [["__todas__","Todas as fotos"]].concat(etapas.map(e=>[e, "Etapa: "+e])).concat([[ETAPA_MANUTENCAO, "Só manutenção"],["__sem__","Sem etapa marcada"]]);
@@ -598,7 +1076,14 @@
     document.getElementById("modalModo").classList.remove("aberto");
     renderModo(); renderProgresso(); renderAmbientes();
   }));
-  document.getElementById("etapaSelect").addEventListener("change", (e)=>{ setEtapaAtual(empAtualId, e.target.value); toast("Etapa atual: " + e.target.value); });
+  document.getElementById("etapaSelect").addEventListener("change", (e)=>{
+    const an = getAndarAtual();
+    if (!an) return;
+    an.etapaAtual = e.target.value; an.etapaTs = Date.now();
+    salvarEstado();
+    renderTabs();
+    toast(an.nome + " → " + e.target.value);
+  });
   document.getElementById("filtroEtapaSelect").addEventListener("change", (e)=>{ filtroEtapa = e.target.value; renderProgresso(); renderAmbientes(); });
 
   // ---------- Render: seletores ----------
@@ -661,7 +1146,7 @@
       const b = document.createElement("button");
       b.type = "button";
       b.className = "tab" + (atual && andar.id===atual.id ? " active" : "");
-      b.textContent = andar.nome;
+      b.innerHTML = esc(andar.nome) + (andar.etapaAtual ? '<br><small style="font-weight:400;font-size:10px;opacity:.8;">'+esc(andar.etapaAtual)+'</small>' : '');
       b.onclick = () => { andarAtualId = andar.id; abertos = {}; renderTudo(); };
       tabs.appendChild(b);
     }
@@ -687,7 +1172,9 @@
       <div class="barra"><div style="width:${pct}%"></div></div>`;
   }
 
+  let geracaoRender = 0;
   async function renderAmbientes(){
+    const minhaGeracao = ++geracaoRender; // um render mais novo cancela este (senão um revogaria as URLs do outro)
     limparObjectUrls();
     const lista = document.getElementById("listaAmbientes");
     lista.innerHTML = "";
@@ -740,6 +1227,7 @@
             const thumb = document.createElement("div");
             thumb.className = "foto-thumb" + (foto.tipo==="video" ? " video" : "");
             const blob = await idbGet(foto.id);
+            if (minhaGeracao !== geracaoRender) return;
             if (blob){
               const url = URL.createObjectURL(blob); objectUrls.push(url);
               const imgTag = foto.tipo==="video"
@@ -747,8 +1235,17 @@
                 : `<img src="${url}" data-view="${amb.id}|${p.id}|${foto.id}">`;
               thumb.innerHTML = `${imgTag}
                 ${foto.etapa ? '<div class="etapa-tag">'+esc(foto.etapa)+'</div>' : ''}
+                ${foto.compactando ? '<div class="compact-tag">compactando…</div>' : ''}
                 ${foto.nota ? '<div class="nota-dot" title="tem observação"></div>' : ''}
                 <div class="mini-btns">
+                  <button type="button" data-retake="${amb.id}|${p.id}|${foto.id}">🔄</button>
+                  <button type="button" data-del="${amb.id}|${p.id}|${foto.id}">🗑</button>
+                </div>`;
+            }
+            if (!blob){
+              // registro veio de outro aparelho sem o arquivo: dá pra refazer ou excluir, nunca fica preso
+              thumb.innerHTML = '<div style="font-size:9px;line-height:1.2;padding:6px 4px;color:#777;">' + (foto.tipo==="video" ? "vídeo só no aparelho que gravou" : "arquivo não está neste aparelho") + '</div>' +
+                `<div class="mini-btns">
                   <button type="button" data-retake="${amb.id}|${p.id}|${foto.id}">🔄</button>
                   <button type="button" data-del="${amb.id}|${p.id}|${foto.id}">🗑</button>
                 </div>`;
@@ -811,24 +1308,24 @@
     if (!nome || !tipoSelecionado){ toast("Preenche o nome e escolhe o tipo"); return; }
     const unidId = gerarId("un");
     const novoEmp = { id: gerarId("emp"), nome, tipo: tipoSelecionado,
-      unidades: [ { id: unidId, nome: (tipoSelecionado==="terreno" ? "Terreno" : "Unidade 1"), andares: moldeUnidade(tipoSelecionado) } ],
+      unidades: [ { id: unidId, nome: (tipoSelecionado==="terreno" ? "Terreno" : "Unidade 1"), andares: moldeUnidade(tipoSelecionado, unidId) } ],
       areasComuns: null, equipamentos: null };
     if (tipoSelecionado==="predio"){
       const numSubsolos = parseInt(document.getElementById("predioSubsolos").value, 10) || 0;
       const numPavimentos = parseInt(document.getElementById("predioPavimentos").value, 10) || 0;
       const temCobertura = document.getElementById("predioCobertura").checked;
-      novoEmp.areasComuns = { andares: moldeAreasComuns(numSubsolos, numPavimentos, temCobertura) };
+      novoEmp.areasComuns = { andares: moldeAreasComuns(numSubsolos, numPavimentos, temCobertura, novoEmp.id) };
       const porAndar = parseInt(document.getElementById("predioUnidadesPorAndar").value, 10) || 0;
       if (porAndar > 0){
         const mapa = {};
         for (const an of novoEmp.areasComuns.andares) if (ehAndarNumerado(an)) mapa[an.id] = porAndar;
         novoEmp.unidades = [];
         gerarUnidadesPorAndar(novoEmp, mapa);
-        if (!novoEmp.unidades.length) novoEmp.unidades.push({ id: unidId, nome: "Unidade 1", andares: moldeUnidade("predio") });
+        if (!novoEmp.unidades.length) novoEmp.unidades.push({ id: unidId, nome: "Unidade 1", andares: moldeUnidade("predio", unidId) });
       }
     }
     if (tipoSelecionado==="casa" || tipoSelecionado==="predio"){
-      novoEmp.equipamentos = { andares: moldeEquipamentos() };
+      novoEmp.equipamentos = { andares: moldeEquipamentos(novoEmp.id) };
     }
     estado.empreendimentos.push(novoEmp);
     empAtualId = novoEmp.id; unidAtualId = novoEmp.unidades.length ? novoEmp.unidades[0].id : "__areas_comuns__"; andarAtualId = null; abertos = {};
@@ -842,7 +1339,8 @@
     const emp = getEmp(empAtualId);
     const nome = await pedirTexto("Nova unidade", "Unidade " + (emp.unidades.length+1));
     if (!nome) return;
-    const novaUnid = { id: gerarId("un"), nome: nome, andares: moldeUnidade(emp.tipo) };
+    const idNova = gerarId("un");
+    const novaUnid = { id: idNova, nome: nome, andares: moldeUnidade(emp.tipo, idNova) };
     emp.unidades.push(novaUnid);
     unidAtualId = novaUnid.id; andarAtualId = null; abertos = {};
     salvarEstado();
@@ -879,7 +1377,8 @@
       for (let i=1;i<=qtd;i++){
         const nome = prefixoUnidade(andar) + String(i).padStart(2,"0");
         if (numerosNoAndar.has(i) || nomesExistentes.has(nome.toLowerCase())) continue;
-        emp.unidades.push({ id: gerarId("un"), nome, andarRef: andar.id, numero: i, andares: moldeUnidade("predio") });
+        const idU = gerarId("un");
+        emp.unidades.push({ id: idU, nome, andarRef: andar.id, numero: i, andares: moldeUnidade("predio", idU) });
         nomesExistentes.add(nome.toLowerCase()); numerosNoAndar.add(i); criadas++;
       }
     }
@@ -935,6 +1434,39 @@
     salvarEstado(); renderTudo(); toast("Unidade excluída");
   });
 
+  // ---------- Modal: etapas por pavimento (todos os andares do empreendimento) ----------
+  function todosAndaresDoEmp(emp){
+    return [].concat(emp.areasComuns ? emp.areasComuns.andares : [], ...emp.unidades.map(u=>u.andares), emp.equipamentos ? emp.equipamentos.andares : []);
+  }
+  document.getElementById("btnEtapasPorPavimento").addEventListener("click", ()=>{
+    const emp = getEmp(empAtualId);
+    const etapas = etapasDoEmp(emp);
+    const lista = document.getElementById("etapasLista");
+    lista.innerHTML = "";
+    const grupos = [];
+    if (emp.areasComuns) grupos.push({nome:"Áreas Comuns", andares: emp.areasComuns.andares});
+    for (const u of emp.unidades) grupos.push({nome: u.nome, andares: u.andares});
+    if (emp.equipamentos) grupos.push({nome:"Equipamentos", andares: emp.equipamentos.andares});
+    for (const g of grupos){
+      lista.insertAdjacentHTML("beforeend", `<div style="font-size:12px;color:var(--sub);margin-top:10px;font-weight:600;">${esc(g.nome)}</div>`);
+      for (const an of g.andares){
+        const efetiva = (an.etapaAtual && etapas.includes(an.etapaAtual)) ? an.etapaAtual : etapas[0]; // mesma regra da foto nova
+        const opts = etapas.map(e=>`<option value="${esc(e)}"${efetiva===e?' selected':''}>${esc(e)}</option>`).join("");
+        lista.insertAdjacentHTML("beforeend", `<div class="duas-col" style="align-items:center;margin-top:4px;"><div style="font-size:13px;">${esc(an.nome)}${an.etapaAtual ? '' : '<br><small style="color:var(--sub)">padrão (ninguém definiu ainda)</small>'}</div><select data-etapa-andar="${esc(an.id)}">${opts}</select></div>`);
+      }
+    }
+    document.getElementById("modalEtapas").classList.add("aberto");
+  });
+  document.getElementById("etapasLista").addEventListener("change", (e)=>{
+    const sel = e.target.closest("[data-etapa-andar]");
+    if (!sel) return;
+    const an = todosAndaresDoEmp(getEmp(empAtualId)).find(a=>a.id===sel.getAttribute("data-etapa-andar"));
+    if (!an) return;
+    an.etapaAtual = sel.value; an.etapaTs = Date.now();
+    salvarEstado();
+  });
+  document.getElementById("etapasFechar").onclick = () => { document.getElementById("modalEtapas").classList.remove("aberto"); renderTudo(); };
+
   // ---------- Modal: editar andar (nome, posição, excluir) ----------
   function contarFotosAndar(andar){
     let n=0; for (const amb of andar.ambientes) for (const p of amb.paredes) n += p.fotos.length; return n;
@@ -981,7 +1513,9 @@
     }
     const ok = await pedirConfirmacao("Excluir andar/setor", 'Excluir "'+andar.nome+'" e os '+andar.ambientes.length+' ambiente(s) dele? Está tudo zerado, não perde foto nenhuma.', "Excluir");
     if (!ok) return;
-    cont.andares = cont.andares.filter(a=>a.id!==andar.id);
+    const contAgora = getUnidadeOuComum(); // outra aba pode ter trocado a árvore enquanto o modal esperava
+    if (!contAgora || !contAgora.andares.find(a=>a.id===andar.id)){ toast("Esse andar já não existe"); renderTudo(); return; }
+    contAgora.andares = contAgora.andares.filter(a=>a.id!==andar.id);
     andarAtualId = null; abertos = {};
     salvarEstado();
     document.getElementById("modalAndar").classList.remove("aberto");
@@ -1128,12 +1662,16 @@
       const [ambId, paredeId, fotoId] = delEl.getAttribute("data-del").split("|");
       const ok = await pedirConfirmacao("Excluir registro", "Excluir esta foto/vídeo?", "Excluir");
       if (!ok) return;
-      await idbDelete(fotoId);
-      const amb = andar.ambientes.find(a=>a.id===ambId);
+      // re-resolve DEPOIS do modal (outra aba pode ter trocado a árvore) e grava a árvore ANTES de apagar o
+      // arquivo: registro sem arquivo é lixo recuperável; arquivo apagado com registro vivo é perda
+      const andarAgora = getAndarAtual();
+      const amb = andarAgora && andarAgora.ambientes.find(a=>a.id===ambId);
       const parede = amb && amb.paredes.find(p=>p.id===paredeId);
-      if (!parede) return;
+      if (!parede || !parede.fotos.some(f=>f.id===fotoId)){ toast("Esse registro já não existe"); renderAmbientes(); return; }
       parede.fotos = parede.fotos.filter(f=>f.id!==fotoId);
-      salvarEstado();
+      marcarRemovido(fotoId);
+      if (!salvarEstado()){ reverterParaDisco(); return; }
+      await idbDelete(fotoId);
       renderProgresso(); renderAmbientes();
       toast("Excluído");
       return;
@@ -1220,36 +1758,66 @@
     if (!file || !alvo) return;
     const quem = document.getElementById("quemSelect").value;
     const ehVideo = file.type.startsWith("video/");
+    // a parede é re-resolvida por id depois de cada await: outra aba pode ter trocado a árvore no meio
+    const acharParede = ()=>{ const an = getAndarAtual(); const a = an && an.ambientes.find(a=>a.id===alvo.ambienteId); return (a && a.paredes.find(p=>p.id===alvo.paredeId)) || null; };
+    if (!acharParede()){ toast("Esse ambiente mudou — abre de novo e tenta outra vez"); return; }
+    // sem WebCodecs, a rota antiga (canvas) precisa começar AGORA, dentro do toque — senão o celular bloqueia o áudio.
+    // Se o fluxo abortar antes de agendar, o token cancela a rota antiga (senão ela rodaria até o fim com a faixa presa).
+    const tokenLegado = { cancelado: false };
+    const promessaLegada = (ehVideo && !VIDEO_RAPIDO_OK) ? comprimirVideo(file, (p)=>mostrarProgressoVideo(p, 0, true), tokenLegado) : null;
+    let agendado = false;
+    const abortarLegado = ()=>{ if (promessaLegada && !agendado){ tokenLegado.cancelado = true; promessaLegada.then(()=>esconderProgressoVideo()); } };
     try{
-      const andar = getAndarAtual();
-      const amb = andar && andar.ambientes.find(a=>a.id===alvo.ambienteId);
-      const parede = amb && amb.paredes.find(p=>p.id===alvo.paredeId);
-      if (!parede){ toast("Esse ambiente mudou — abre de novo e tenta outra vez"); return; }
-      if (ehVideo && file.size > 80*1024*1024){
-        const ok = await pedirConfirmacao("Vídeo grande", "Esse vídeo tem " + Math.round(file.size/1024/1024) + "MB — pode demorar ou pesar no celular. Salvar mesmo assim?", "Salvar mesmo assim");
-        if (!ok) return;
+      let blob;
+      if (ehVideo){
+        if (file.size > 250e6){
+          const ok = await pedirConfirmacao("Vídeo muito grande", "Esse vídeo tem " + mb(file.size) + " — vai pesar no celular e a compactação pode falhar. Salvar mesmo assim?", "Salvar mesmo assim");
+          if (!ok){ abortarLegado(); return; }
+        }
+        blob = file; // o original entra JÁ; a compactação roda em segundo plano e troca o arquivo depois
+      } else {
+        blob = await compressImage(file);
       }
-      const blob = ehVideo ? file : await compressImage(file);
+      // ordem que não perde nada: grava o arquivo novo → mexe na árvore → grava a árvore → só então apaga o
+      // arquivo antigo. Se a árvore não gravar (sem espaço), desfaz e apaga o arquivo novo.
+      let idGravado = null, apagarDepois = null, msg = "", fotoAlterada = null, antes = null;
       if (alvo.replaceId){
-        const foto = parede.fotos.find(f=>f.id===alvo.replaceId);
-        if (!foto){ toast("Esse registro não existe mais"); return; }
         const novoId = novoIdFoto(quem);
         await idbPut(novoId, blob);
-        await idbDelete(alvo.replaceId);
+        const parede = acharParede();
+        const foto = parede && parede.fotos.find(f=>f.id===alvo.replaceId);
+        if (!foto){ await idbDelete(novoId); toast("Esse registro não existe mais"); abortarLegado(); return; }
+        antes = Object.assign({}, foto); fotoAlterada = foto; apagarDepois = alvo.replaceId;
+        marcarRemovido(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
+        foto.compactando = ehVideo; foto.tamanho = blob.size; delete foto.comprimido;
         if (!foto.etapa) foto.etapa = etapaParaNovaFoto(); // foto antiga sem etapa ganha a atual ao ser refeita
-        toast("Atualizado" + garantirVisivel(foto));
+        idGravado = novoId;
+        msg = "Atualizado" + (ehVideo ? " · vídeo salvo, compactando em segundo plano" : "") + garantirVisivel(foto);
       } else {
         const id = novoIdFoto(quem);
         await idbPut(id, blob);
-        const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFoto() };
+        const parede = acharParede();
+        if (!parede){ await idbDelete(id); toast("Esse ambiente mudou — abre de novo e tenta outra vez"); abortarLegado(); return; }
+        const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFoto(), compactando: ehVideo, tamanho: blob.size };
         parede.fotos.push(novaFoto);
-        toast((ehVideo ? "Vídeo adicionado" : "Foto adicionada") + " · " + novaFoto.etapa + garantirVisivel(novaFoto));
+        idGravado = id;
+        msg = (ehVideo ? "Vídeo salvo · compactando em segundo plano" : "Foto adicionada") + " · " + novaFoto.etapa + garantirVisivel(novaFoto);
       }
-      salvarEstado();
+      if (!salvarEstado()){
+        if (fotoAlterada) Object.assign(fotoAlterada, antes);
+        else { const p = acharParede(); if (p) p.fotos = p.fotos.filter(f=>f.id!==idGravado); }
+        await idbDelete(idGravado);
+        abortarLegado(); renderAmbientes();
+        return;
+      }
+      if (apagarDepois) await idbDelete(apagarDepois);
+      toast(msg);
       renderProgresso(); renderAmbientes();
+      if (ehVideo && idGravado){ agendado = true; agendarCompactacao(idGravado, file, promessaLegada); }
     } catch(err){
       console.error(err);
+      abortarLegado();
       toast("Não consegui salvar");
     }
   });
@@ -1270,21 +1838,45 @@
   }
   document.getElementById("btnExportar").addEventListener("click", async ()=>{
     toast("Preparando backup...");
-    const pacote = { versao:3, geradoEm: new Date().toISOString(), estado, midiaBase64:{} };
-    for (const p of todasParedes()){
-      for (const foto of p.fotos){
-        const blob = await idbGet(foto.id);
-        if (blob) pacote.midiaBase64[foto.id] = await blobToDataURL(blob);
+    try{
+      // vídeos ficam FORA do backup manual: em base64 numa string só, poucos vídeos já estouram o
+      // limite do navegador (o export morria calado). A sincronização automática cuidará deles.
+      // O texto do backup ocupa até 10x os bytes de mídia na memória do celular (base64 + texto único).
+      // Por isso: (1) cada arquivo leva no máximo 40 MB de mídia — passou, abre outro arquivo (parte 2, 3...);
+      // (2) o arquivo é montado por pedaços, nunca numa string só; (3) vídeo acima de 15 MB fica de fora.
+      const LIMITE_PARTE = 40e6, LIMITE_VIDEO = 15e6;
+      const cabecalho = JSON.stringify({ versao:3, geradoEm: new Date().toISOString(), estado });
+      const ids = []; for (const p of todasParedes()) for (const foto of p.fotos) ids.push(foto.id);
+      const partes = []; let pedacos = [], bytes = 0, primeiro = true, pulados = 0, incluidos = 0;
+      const abrir = ()=>{ pedacos = [cabecalho.slice(0, -1) + ',"midiaBase64":{']; bytes = 0; primeiro = true; };
+      const fechar = ()=>{ pedacos.push("}}"); partes.push(new Blob(pedacos, {type:"application/json"})); pedacos = []; };
+      abrir();
+      for (const id of ids){
+        const b = await idbGet(id);
+        if (!b) continue;
+        if (b.size > LIMITE_VIDEO){ pulados++; continue; }
+        if (bytes && bytes + b.size > LIMITE_PARTE){ fechar(); abrir(); }
+        const dataUrl = await blobToDataURL(b);
+        pedacos.push((primeiro ? "" : ",") + JSON.stringify(id) + ":" + JSON.stringify(dataUrl));
+        primeiro = false; bytes += b.size; incluidos++;
       }
+      fechar();
+      const ts = new Date().toISOString().slice(0,16).replace(/[-:T]/g,"");
+      for (let i = 0; i < partes.length; i++){
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(partes[i]);
+        a.download = `backup-fotos-obra-${ts}` + (partes.length > 1 ? `-parte${i+1}de${partes.length}` : "") + ".json";
+        document.body.appendChild(a); a.click(); a.remove();
+        if (i < partes.length - 1) await new Promise(r=>setTimeout(r, 700));
+      }
+      let resumo = incluidos + " arquivo(s) de foto/vídeo" + (partes.length > 1 ? " em " + partes.length + " arquivos de backup (importe todos, em qualquer ordem)" : "") + ".";
+      if (pulados) resumo += " " + pulados + " vídeo(s) acima de 15 MB ficaram de fora — por enquanto existem só neste aparelho.";
+      if (partes.length > 1 || pulados) await avisar("Backup baixado", resumo);
+      else toast("Backup baixado — pode mandar esse arquivo pro Claude");
+    }catch(err){
+      console.error(err);
+      await avisar("Backup falhou", "Não consegui montar o backup (provavelmente memória do aparelho). Tenta de novo depois de fechar outros apps; se repetir, me avisa.");
     }
-    const json = JSON.stringify(pacote);
-    const blob = new Blob([json], {type:"application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    const ts = new Date().toISOString().slice(0,16).replace(/[-:T]/g,"");
-    a.download = `backup-fotos-obra-${ts}.json`;
-    document.body.appendChild(a); a.click(); a.remove();
-    toast("Backup baixado — pode mandar esse arquivo pro Claude");
   });
 
   document.getElementById("btnImportar").addEventListener("click", ()=> document.getElementById("inputImportar").click());
@@ -1306,30 +1898,14 @@
         const blob = dataURLToBlob(base64Map[id]);
         await idbPut(id, blob);
       }
-      for (const empOrigem of pacote.estado.empreendimentos){
-        let empDestino = estado.empreendimentos.find(e=>e.id===empOrigem.id);
-        if (!empDestino){ estado.empreendimentos.push(empOrigem); continue; }
-        for (const unidOrigem of empOrigem.unidades){
-          let unidDestino = empDestino.unidades.find(u=>u.id===unidOrigem.id);
-          if (!unidDestino){ empDestino.unidades.push(unidOrigem); continue; }
-          fundirAndares(unidDestino.andares, unidOrigem.andares);
-        }
-        if (empOrigem.areasComuns){
-          if (!empDestino.areasComuns) empDestino.areasComuns = empOrigem.areasComuns;
-          else fundirAndares(empDestino.areasComuns.andares, empOrigem.areasComuns.andares);
-        }
-        if (empOrigem.equipamentos){
-          if (!empDestino.equipamentos) empDestino.equipamentos = empOrigem.equipamentos;
-          else fundirAndares(empDestino.equipamentos.andares, empOrigem.equipamentos.andares);
-        }
-      }
+      const antesFotos = contarFotos(estado);
+      const juntados = fundirEstados(estado, sanearEstado(pacote.estado));
       sanearEstado(estado);
       salvarEstado();
       renderTudo();
-      const nomes = estado.empreendimentos.map(e=>e.nome.trim().toLowerCase());
-      const duplicado = nomes.find((n,i)=>nomes.indexOf(n)!==i);
-      if (duplicado){
-        await avisar("Atenção — possível duplicata", 'Agora existem 2 empreendimentos chamados "' + duplicado + '" — provavelmente cada celular criou o dele antes de importar o do outro. São duas árvores separadas; me manda o backup que eu te ajudo a juntar.');
+      const novas = contarFotos(estado) - antesFotos;
+      if (juntados){
+        await avisar("Backup importado", novas + " registro(s) novo(s). " + juntados + " empreendimento(s) com o mesmo nome foram juntados num só (cada celular tinha criado o seu).");
       } else {
         toast("Backup importado");
       }
@@ -1338,25 +1914,100 @@
       await avisar("Erro", "Não consegui ler esse arquivo de backup.");
     }
   });
-  function fundirAndares(destino, origem){
-    for (const anOrigem of origem){
-      let anDestino = destino.find(a=>a.id===anOrigem.id);
+  const nomeNorm = (s)=> String(s||"").trim().toLowerCase();
+  // casa por id; senão por NOME (versões antigas geravam id aleatório, então o "Térreo" de um celular e o do
+  // outro tinham ids diferentes e a junção duplicava a árvore inteira). O i-ésimo homônimo casa com o i-ésimo.
+  function casar(destino, origem){
+    const usados = new Set();
+    return (origem||[]).map(o => {
+      let d = destino.find(x => x.id === o.id && !usados.has(x));
+      if (!d) d = destino.find(x => nomeNorm(x.nome) === nomeNorm(o.nome) && !usados.has(x));
+      if (d) usados.add(d);
+      return [o, d || null];
+    });
+  }
+  function fundirAndares(destino, origem, tomb){
+    tomb = tomb || new Set();
+    for (const [anOrigem, anDestino] of casar(destino, origem)){
       if (!anDestino){ destino.push(anOrigem); continue; }
-      for (const ambOrigem of anOrigem.ambientes){
-        let ambDestino = anDestino.ambientes.find(a=>a.id===ambOrigem.id);
+      // etapa: a mudança mais RECENTE vence (dois celulares podem ter mexido no mesmo andar)
+      if (anOrigem.etapaAtual && (!anDestino.etapaAtual || (anOrigem.etapaTs||0) > (anDestino.etapaTs||0))){ anDestino.etapaAtual = anOrigem.etapaAtual; anDestino.etapaTs = anOrigem.etapaTs||0; }
+      for (const [ambOrigem, ambDestino] of casar(anDestino.ambientes, anOrigem.ambientes)){
         if (!ambDestino){ anDestino.ambientes.push(ambOrigem); continue; }
-        for (const pOrigem of ambOrigem.paredes){
-          let pDestino = ambDestino.paredes.find(p=>p.id===pOrigem.id);
+        for (const [pOrigem, pDestino] of casar(ambDestino.paredes, ambOrigem.paredes)){
           if (!pDestino){ ambDestino.paredes.push(pOrigem); continue; }
           const idsExistentes = new Set(pDestino.fotos.map(f=>f.id));
-          for (const foto of pOrigem.fotos) if (!idsExistentes.has(foto.id)) pDestino.fotos.push(foto);
+          for (const foto of pOrigem.fotos||[]) if (!idsExistentes.has(foto.id) && !tomb.has(foto.id)) pDestino.fotos.push(foto);
         }
       }
     }
   }
+  // junta uma árvore inteira na nossa (backup importado, aba antiga, outra aba): só ACRESCENTA, nunca apaga
+  function fundirEstados(destino, origem){
+    let juntadosPorNome = 0;
+    const tomb = lapides(destino, origem);
+    for (const [empOrigem, empDestino] of casar(destino.empreendimentos, origem.empreendimentos)){
+      if (!empDestino){ destino.empreendimentos.push(empOrigem); continue; }
+      if (empDestino.id !== empOrigem.id) juntadosPorNome++;
+      for (const [unidOrigem, unidDestino] of casar(empDestino.unidades, empOrigem.unidades)){
+        if (!unidDestino){ empDestino.unidades.push(unidOrigem); continue; }
+        fundirAndares(unidDestino.andares, unidOrigem.andares, tomb);
+      }
+      for (const setor of ["areasComuns","equipamentos"]){
+        if (!empOrigem[setor]) continue;
+        if (!empDestino[setor]) empDestino[setor] = empOrigem[setor];
+        else fundirAndares(empDestino[setor].andares, empOrigem[setor].andares, tomb);
+      }
+    }
+    // lápides se somam e valem para a árvore inteira (inclusive o que veio de fora)
+    const vistas = new Set((destino.removidos||[]).map(r=>r.id));
+    for (const r of (origem.removidos||[])) if (!vistas.has(r.id)){ (destino.removidos = destino.removidos||[]).push(r); vistas.add(r.id); }
+    if (tomb.size) for (const e of destino.empreendimentos){ const conts = [].concat(e.unidades||[], e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]); for (const c of conts) for (const an of c.andares||[]) for (const amb of an.ambientes||[]) for (const pd of amb.paredes||[]) pd.fotos = (pd.fotos||[]).filter(f => !tomb.has(f.id)); }
+    return juntadosPorNome;
+  }
 
   renderTudo();
   if (!modo) document.getElementById("modalModo").classList.add("aberto");
+  (async function retomarCompactacoes(){
+    const pendentes = []; for (const p of todasParedes()) for (const f of p.fotos) if (f.compactando) pendentes.push(f);
+    let n = 0, limpos = 0;
+    for (const f of pendentes){
+      if (f.comprimido){ f.compactando = false; limpos++; continue; } // já compactado: a marca voltou por engano
+      // vindo de backup de outro aparelho, o arquivo pode nem estar aqui — aí só tira a marca
+      const temArquivo = VIDEO_RAPIDO_OK && !!(await idbGet(f.id));
+      if (temArquivo){ agendarCompactacao(f.id, null, null); n++; } else { f.compactando = false; limpos++; }
+    }
+    if (limpos){ salvarEstado(); renderAmbientes(); }
+    if (n) toast(n + " vídeo(s) ainda por compactar — retomando em segundo plano");
+  })();
+  // faxina: arquivo no IndexedDB que nenhum registro aponta (gravação que falhou por falta de espaço, exclusão
+  // interrompida) ocupa o celular para sempre e nenhuma tela mostra. Só apaga o que tem mais de 10 minutos.
+  async function varrerOrfaos(){
+    try{
+      const usados = new Set(); for (const p of todasParedes()) for (const f of p.fotos) usados.add(f.id);
+      try{ const antigo = localStorage.getItem(LS_KEY_ANTIGA); if (antigo) for (const m of antigo.matchAll(/"id":"([^"]+)"/g)) usados.add(m[1]); }catch(e){}
+      const agora = Date.now(); let n = 0, bytes = 0;
+      for (const chave of await idbTodasChaves()){
+        if (usados.has(chave)) continue;
+        const ts = parseInt(String(chave).split("_")[1], 10);
+        if (isFinite(ts) && agora - ts < 10*60*1000) continue; // pode ser foto sendo gravada agora por outra aba
+        const b = await idbGet(chave); bytes += b ? b.size : 0;
+        await idbDelete(chave); n++;
+      }
+      if (n) console.info("faxina: " + n + " arquivo(s) órfão(s) removido(s), " + mb(bytes));
+      return n;
+    }catch(e){ console.warn("faxina falhou", e); return 0; }
+  }
+  async function avisarEspaco(){
+    try{
+      if (!navigator.storage || !navigator.storage.estimate) return;
+      const est = await navigator.storage.estimate();
+      if (est.quota && est.usage / est.quota > 0.85) toast("Armazenamento do celular quase cheio: " + mb(est.usage) + " de " + mb(est.quota) + " usados");
+    }catch(e){}
+  }
+  setTimeout(()=>{ varrerOrfaos(); avisarEspaco(); }, 3000);
+  // gancho de teste (só no servidor local de desenvolvimento; não existe na versão publicada)
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__obraDebug = { setPendente:(p)=>{ pendente = p; }, comprimirVideoRapido, comprimirVideo, idbGet, idbTodasChaves, estado:()=>estado, acharFotoPorId, salvarEstado, fundirEstados, varrerOrfaos, LS_KEY, VIDEO_RAPIDO_OK };
 })();
 </script>
 </body>
