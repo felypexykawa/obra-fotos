@@ -41,10 +41,12 @@
   .ambiente-body{display:none;padding:0 14px 14px;border-top:1px solid var(--line);}
   .ambiente-card.aberto .ambiente-body{display:block;}
   .ambiente-acoes{display:flex;gap:14px;padding:8px 0 4px;font-size:12px;color:var(--sub);}
+  .ambiente-acoes span{cursor:pointer;}
+  .ambiente-acoes .perigo{color:var(--accent-dark);}
   .parede-row{padding:10px 0;border-bottom:1px dashed var(--line);}
   .parede-row:last-of-type{border-bottom:none;}
   .parede-titulo{font-size:13px;font-weight:600;color:var(--sub);margin-bottom:6px;display:flex;justify-content:space-between;}
-  .parede-titulo .renomear{font-weight:400;font-size:11px;color:#9a9a9a;}
+  .parede-titulo .renomear{font-weight:400;font-size:11px;color:#9a9a9a;cursor:pointer;}
   .mes-label{font-size:11px;font-weight:600;color:#8a7d55;background:#fbf4de;display:inline-block;padding:2px 8px;border-radius:8px;margin:6px 0 6px;}
   .fotos-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
   .foto-thumb{position:relative;width:74px;height:74px;border-radius:8px;overflow:hidden;background:#eee;}
@@ -68,10 +70,11 @@
   .lightbox .lb-fechar{position:absolute;top:14px;right:16px;color:#fff;font-size:26px;background:none;border:none;}
   .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;}
   .toast.show{opacity:1;}
-  .modal-fundo{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:70;padding:20px;}
+  .modal-fundo{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:70;padding:20px;overflow-y:auto;}
   .modal-fundo.aberto{display:flex;}
-  .modal{background:#fff;border-radius:12px;padding:18px;width:100%;max-width:360px;}
+  .modal{background:#fff;border-radius:12px;padding:18px;width:100%;max-width:360px;max-height:90vh;overflow-y:auto;}
   .modal h3{margin:0 0 12px;font-size:16px;}
+  .modal p{font-size:14px;color:#444;line-height:1.4;}
   .modal label{display:block;font-size:12px;color:var(--sub);margin:10px 0 4px;}
   .modal input[type=text], .modal textarea{width:100%;padding:9px;border-radius:6px;border:1px solid var(--line);font-size:14px;font-family:inherit;}
   .tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
@@ -83,6 +86,9 @@
   .modal-acoes button{flex:1;padding:10px;border-radius:8px;border:none;font-size:14px;font-weight:600;}
   .modal-acoes .cancelar{background:#eee;color:#555;}
   .modal-acoes .confirmar{background:var(--accent);color:#fff;}
+  .check-row{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;}
+  .check-row input{width:18px;height:18px;}
+  .duas-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 </style>
 </head>
 <body>
@@ -99,7 +105,7 @@
   </div>
   <button class="btn-mini" id="btnNovoEmp">+ Empreendimento</button>
   <div>
-    <label>Unidade</label>
+    <label>Unidade / Setor</label>
     <select id="unidSelect"></select>
   </div>
   <button class="btn-mini" id="btnNovaUnid">+ Unidade</button>
@@ -107,7 +113,7 @@
 
 <div class="tabs" id="tabs"></div>
 <div class="ambiente-acoes" style="padding:8px 14px 0;">
-  <span id="btnNovoAndar" style="cursor:pointer;">+ Adicionar andar/setor</span>
+  <span id="btnNovoAndar">+ Adicionar andar/setor</span>
 </div>
 <div class="quem-row">
   Quem está fotografando:
@@ -150,10 +156,18 @@
     <input type="text" id="empNomeInput" placeholder="Ex: Residencial X">
     <label>Tipo</label>
     <div class="tipo-grid" id="tipoGrid">
-      <button class="tipo-btn" data-tipo="terreno">Terreno</button>
-      <button class="tipo-btn" data-tipo="casa">Casa</button>
-      <button class="tipo-btn" data-tipo="apto">Apto</button>
-      <button class="tipo-btn" data-tipo="predio">Prédio</button>
+      <button class="tipo-btn" data-tipo="terreno" type="button">Terreno</button>
+      <button class="tipo-btn" data-tipo="casa" type="button">Casa</button>
+      <button class="tipo-btn" data-tipo="apto" type="button">Apto</button>
+      <button class="tipo-btn" data-tipo="predio" type="button">Prédio</button>
+    </div>
+    <div id="predioExtras" style="display:none;">
+      <div class="duas-col">
+        <div><label>Pavimentos (apês)</label><input type="text" inputmode="numeric" id="predioAndares" placeholder="Ex: 10"></div>
+        <div><label>Andares de garagem</label><input type="text" inputmode="numeric" id="predioGaragens" placeholder="Ex: 2"></div>
+      </div>
+      <label>Áreas comuns (marca as que existem)</label>
+      <div id="predioAmenidades"></div>
     </div>
     <div class="modal-acoes">
       <button class="cancelar" id="empCancelar">Cancelar</button>
@@ -178,12 +192,56 @@
   </div>
 </div>
 
+<!-- Modal generico: texto / confirmar / avisar (substitui prompt/confirm/alert nativos,
+     que ficam bloqueados/silenciosos dentro de navegadores embutidos tipo WhatsApp/Telegram) -->
+<div class="modal-fundo" id="modalGenerico">
+  <div class="modal">
+    <h3 id="genTitulo"></h3>
+    <p id="genMsg" style="display:none;"></p>
+    <input type="text" id="genInput" style="display:none;">
+    <div class="modal-acoes">
+      <button class="cancelar" id="genCancelar">Cancelar</button>
+      <button class="confirmar" id="genConfirmar">OK</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
 
   const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  const AREAS_COMUNS_SUGESTOES = ["Academia","Salão de Jogos","Área de Piscina","Playground","Cinema","Garagem Subsolo","Garagem Térreo","Garagem 2° Pavimento"];
+  const AREAS_COMUNS_SUGESTOES = ["Salão de Jogos","Academia","Área de Piscina","Playground","Cinema"];
+  const EQUIPAMENTOS_SUGESTOES = ["Placas Solares","Gerador","Bomba de Cisterna","Bomba de Drenagem","Elevador","Bomba de Piscina","Bomba de Cascata","Câmeras"];
+
+  // ---------- Modal genérico (troca prompt/confirm/alert nativos por UI própria) ----------
+  function modalGenerico(opts){
+    return new Promise((resolve)=>{
+      document.getElementById("genTitulo").textContent = opts.titulo || "";
+      const msgEl = document.getElementById("genMsg");
+      msgEl.style.display = opts.msg ? "block" : "none";
+      msgEl.textContent = opts.msg || "";
+      const inputEl = document.getElementById("genInput");
+      inputEl.style.display = opts.comInput ? "block" : "none";
+      inputEl.value = opts.valorInicial || "";
+      document.getElementById("genCancelar").style.display = opts.apenasOk ? "none" : "block";
+      document.getElementById("genConfirmar").textContent = opts.textoOk || "OK";
+      const modal = document.getElementById("modalGenerico");
+      modal.classList.add("aberto");
+      if (opts.comInput) setTimeout(()=>inputEl.focus(), 60);
+      const ok = document.getElementById("genConfirmar"), can = document.getElementById("genCancelar");
+      function limpar(){ modal.classList.remove("aberto"); ok.removeEventListener("click", onOk); can.removeEventListener("click", onCan); inputEl.removeEventListener("keydown", onKey); }
+      function onOk(){ const v = opts.comInput ? inputEl.value.trim() : true; limpar(); resolve(v); }
+      function onCan(){ limpar(); resolve(opts.comInput ? null : false); }
+      function onKey(e){ if (e.key==="Enter") onOk(); }
+      ok.addEventListener("click", onOk);
+      can.addEventListener("click", onCan);
+      inputEl.addEventListener("keydown", onKey);
+    });
+  }
+  function pedirTexto(titulo, valorInicial){ return modalGenerico({titulo, comInput:true, valorInicial}); }
+  function pedirConfirmacao(titulo, msg, textoOk){ return modalGenerico({titulo, msg, textoOk}); }
+  function avisar(titulo, msg){ return modalGenerico({titulo, msg, apenasOk:true}); }
 
   function gerarId(prefixo){ return prefixo + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7); }
 
@@ -222,18 +280,30 @@
     if (tipo==="casa"){
       return [ novoAndar("Térreo", ROOMS_CASA_PADRAO), novoAndar("2° Pavimento", ROOMS_CASA_2PAV) ];
     }
-    if (tipo==="apto"){
-      return [ novoAndar("Único", ROOMS_APTO) ];
-    }
-    if (tipo==="predio"){
-      return [ novoAndar("Único", ROOMS_APTO) ]; // molde por unidade/apto dentro do predio
-    }
-    return [ novoAndar("Único", []) ];
+    // apto e predio (por unidade dentro do predio) usam o mesmo ponto de partida —
+    // cada unidade real varia (1 quarto, 2 quartos, suíte+quarto...): edite/exclua depois de criar.
+    return [ novoAndar("Único", ROOMS_APTO) ];
   }
-  function moldeAreasComuns(){
-    return [ novoAndar("Áreas Comuns", [
-      {nome:"Hall de Entrada"}, {nome:"Salão de Festas"}, {nome:"Corredores"}
-    ]) ];
+  function nomeGaragem(i){
+    const nomes = ["Garagem Subsolo","Garagem Térreo","Garagem 2° Pavimento"];
+    return nomes[i-1] || ("Garagem Nível "+i);
+  }
+  function moldeAreasComuns(numAndares, numGaragens, amenidades){
+    const andares = [];
+    const terreoAmbientes = [{nome:"Hall de Entrada"}].concat((amenidades||[]).map(a=>({nome:a})));
+    andares.push(novoAndar("Térreo / Entrada", terreoAmbientes));
+    for (let i=1;i<=(numAndares||0);i++){
+      andares.push(novoAndar(i+"° Andar", [{nome:"Corredor"},{nome:"Hall"}]));
+    }
+    for (let i=1;i<=(numGaragens||0);i++){
+      andares.push(novoAndar(nomeGaragem(i), [{nome:"Área de Garagem"}]));
+    }
+    return andares;
+  }
+  function moldeEquipamentos(){
+    const andar = novoAndar("Equipamentos", [ {nome:"Portão"}, {nome:"Interfone"} ]);
+    andar.id = "an_equipamentos_default"; // id fixo — evita duplicar quando 2 celulares criam o padrão cada um por conta
+    return [ andar ];
   }
 
   // ---------- IndexedDB (guarda o BLOB da foto/vídeo — localStorage só guarda estrutura) ----------
@@ -307,25 +377,23 @@
     return new Blob([arr], {type:mime});
   }
 
-  // ---------- Estado (tudo em array com id — tudo é adicionável dinamicamente) ----------
+  // ---------- Estado ----------
   const LS_KEY = "obraFotosEstado_v3";
   function estadoPadrao(){
-    // ids FIXOS (nao gerarId) neste ponto de partida — assim, celulares diferentes que nunca
-    // trocaram backup ainda comecam com o MESMO id pro Serena Essence e nao duplicam ao importar.
-    // Empreendimento CRIADO por "+ Empreendimento" ja usa id aleatorio — so o padrao de fabrica é fixo.
     return { empreendimentos: [
       { id: "emp_serena_essence_default", nome: "Residencial Serena Essence", tipo:"casa",
         unidades: [ { id: "un_serena_unidade1_default", nome: "Unidade 1", andares: moldeUnidade("casa") } ],
-        areasComuns: null }
+        areasComuns: null, equipamentos: { andares: moldeEquipamentos() } }
     ]};
   }
   function sanearEstado(st){
-    // defende contra empreendimento malformado (ex: vindo de um backup/merge incompleto) —
-    // em vez de quebrar a tela ao selecionar, garante a forma minima esperada.
     st.empreendimentos = (st.empreendimentos||[]).filter(e => e && e.id).map(e => {
       e.unidades = Array.isArray(e.unidades) ? e.unidades : [];
       e.unidades.forEach(u => { u.andares = Array.isArray(u.andares) ? u.andares : []; });
       if (e.areasComuns && !Array.isArray(e.areasComuns.andares)) e.areasComuns.andares = [];
+      if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0,0,[]) }; // restaura se faltar — evita tela vazia/quebrada
+      if (e.equipamentos && !Array.isArray(e.equipamentos.andares)) e.equipamentos.andares = [];
+      if (!e.equipamentos && (e.tipo==="casa"||e.tipo==="predio")) e.equipamentos = { andares: moldeEquipamentos() };
       return e;
     });
     return st;
@@ -343,19 +411,21 @@
 
   let estado = carregarEstado();
   let empAtualId = estado.empreendimentos[0].id;
-  let unidAtualId = "__areas_comuns__";
-  (function initUnid(){
-    const emp = getEmp(empAtualId);
-    unidAtualId = emp.unidades.length ? emp.unidades[0].id : "__areas_comuns__";
-  })();
+  let unidAtualId = null;
   let andarAtualId = null;
   let abertos = {};
   const objectUrls = [];
 
   function getEmp(id){ return estado.empreendimentos.find(e=>e.id===id); }
+  function contextoPadrao(emp){
+    return emp.unidades.length ? emp.unidades[0].id : (emp.areasComuns ? "__areas_comuns__" : "__equipamentos__");
+  }
+  (function initUnid(){ unidAtualId = contextoPadrao(getEmp(empAtualId)); })();
+
   function getUnidadeOuComum(){
     const emp = getEmp(empAtualId);
     if (unidAtualId==="__areas_comuns__") return emp.areasComuns;
+    if (unidAtualId==="__equipamentos__") return emp.equipamentos;
     return emp.unidades.find(u=>u.id===unidAtualId);
   }
   function getAndarAtual(){
@@ -398,21 +468,25 @@
     if (emp.tipo==="predio"){
       const o = document.createElement("option"); o.value="__areas_comuns__"; o.textContent = "— Áreas Comuns —";
       unidSel.appendChild(o);
-      if (!emp.areasComuns){ emp.areasComuns = { andares: moldeAreasComuns() }; salvarEstado(); }
     }
-    if (!emp.unidades.find(u=>u.id===unidAtualId) && unidAtualId!=="__areas_comuns__"){
-      unidAtualId = emp.unidades.length ? emp.unidades[0].id : "__areas_comuns__";
+    if (emp.equipamentos){
+      const o = document.createElement("option"); o.value="__equipamentos__"; o.textContent = "— Equipamentos —";
+      unidSel.appendChild(o);
     }
+    const opcoesValidas = [...unidSel.options].map(o=>o.value);
+    if (!opcoesValidas.includes(unidAtualId)) unidAtualId = contextoPadrao(emp);
     unidSel.value = unidAtualId;
 
     document.getElementById("tituloTopo").textContent = emp.nome;
-    const nomeCtx = unidAtualId==="__areas_comuns__" ? "Áreas Comuns" : emp.unidades.find(u=>u.id===unidAtualId).nome;
+    let nomeCtx;
+    if (unidAtualId==="__areas_comuns__") nomeCtx = "Áreas Comuns";
+    else if (unidAtualId==="__equipamentos__") nomeCtx = "Equipamentos";
+    else nomeCtx = (emp.unidades.find(u=>u.id===unidAtualId)||{nome:""}).nome;
     document.getElementById("subtituloTopo").textContent = nomeCtx + " · registro por ambiente";
   }
   document.getElementById("empSelect").addEventListener("change", (e)=>{
     empAtualId = e.target.value;
-    const emp = getEmp(empAtualId);
-    unidAtualId = emp.unidades.length ? emp.unidades[0].id : "__areas_comuns__";
+    unidAtualId = contextoPadrao(getEmp(empAtualId));
     andarAtualId = null; abertos = {};
     renderTudo();
   });
@@ -427,9 +501,10 @@
     tabs.innerHTML = "";
     const cont = getUnidadeOuComum();
     if (!cont) return;
+    const atual = getAndarAtual();
     for (const andar of cont.andares){
       const b = document.createElement("button");
-      b.className = "tab" + (andar.id===getAndarAtual().id ? " active" : "");
+      b.className = "tab" + (atual && andar.id===atual.id ? " active" : "");
       b.textContent = andar.nome;
       b.onclick = () => { andarAtualId = andar.id; abertos = {}; renderTudo(); };
       tabs.appendChild(b);
@@ -480,7 +555,7 @@
       const body = card.querySelector(".ambiente-body");
       const acoes = document.createElement("div");
       acoes.className = "ambiente-acoes";
-      acoes.innerHTML = `<span data-editar-amb="${amb.id}" style="cursor:pointer;">✎ editar ambiente</span>`;
+      acoes.innerHTML = `<span data-editar-amb="${amb.id}">✎ editar</span><span class="perigo" data-excluir-amb="${amb.id}">🗑 excluir ambiente</span>`;
       body.appendChild(acoes);
       for (const p of amb.paredes){
         const row = document.createElement("div");
@@ -489,7 +564,6 @@
         body.appendChild(row);
         const wrap = row.querySelector("[data-grid-wrap]");
 
-        // agrupa por mes
         const grupos = {};
         for (const foto of p.fotos){
           const k = chaveMes(foto.ts);
@@ -549,12 +623,21 @@
     renderAmbientes();
   }
 
-  // ---------- Modal: novo empreendimento ----------
+  // ---------- Modal: novo empreendimento (com assistente de Prédio) ----------
   let tipoSelecionado = null;
   document.getElementById("btnNovoEmp").addEventListener("click", ()=>{
     tipoSelecionado = null;
     document.getElementById("empNomeInput").value = "";
+    document.getElementById("predioAndares").value = "";
+    document.getElementById("predioGaragens").value = "";
     document.querySelectorAll(".tipo-btn").forEach(b=>b.classList.remove("sel"));
+    document.getElementById("predioExtras").style.display = "none";
+    const amenGrid = document.getElementById("predioAmenidades");
+    amenGrid.innerHTML = "";
+    for (const s of AREAS_COMUNS_SUGESTOES){
+      const id = "amen_"+s.replace(/\s+/g,"_");
+      amenGrid.insertAdjacentHTML("beforeend", `<div class="check-row"><input type="checkbox" id="${id}" value="${s}"><label for="${id}" style="margin:0;">${s}</label></div>`);
+    }
     document.getElementById("modalEmp").classList.add("aberto");
   });
   document.getElementById("tipoGrid").addEventListener("click", (e)=>{
@@ -563,28 +646,40 @@
     document.querySelectorAll(".tipo-btn").forEach(x=>x.classList.remove("sel"));
     b.classList.add("sel");
     tipoSelecionado = b.getAttribute("data-tipo");
+    document.getElementById("predioExtras").style.display = tipoSelecionado==="predio" ? "block" : "none";
   });
   document.getElementById("empCancelar").onclick = () => document.getElementById("modalEmp").classList.remove("aberto");
-  document.getElementById("empConfirmar").onclick = () => {
+  document.getElementById("empConfirmar").addEventListener("click", async ()=>{
     const nome = document.getElementById("empNomeInput").value.trim();
     if (!nome || !tipoSelecionado){ toast("Preenche o nome e escolhe o tipo"); return; }
     const unidId = gerarId("un");
     const novoEmp = { id: gerarId("emp"), nome, tipo: tipoSelecionado,
-      unidades: [ { id: unidId, nome: (tipoSelecionado==="terreno" ? "Terreno" : "Unidade 1"), andares: moldeUnidade(tipoSelecionado) } ],
-      areasComuns: tipoSelecionado==="predio" ? { andares: moldeAreasComuns() } : null };
+      unidades: tipoSelecionado==="terreno"
+        ? [ { id: unidId, nome: "Terreno", andares: moldeUnidade(tipoSelecionado) } ]
+        : [ { id: unidId, nome: "Unidade 1", andares: moldeUnidade(tipoSelecionado) } ],
+      areasComuns: null, equipamentos: null };
+    if (tipoSelecionado==="predio"){
+      const numAndares = parseInt(document.getElementById("predioAndares").value, 10) || 0;
+      const numGaragens = parseInt(document.getElementById("predioGaragens").value, 10) || 0;
+      const amenidades = [...document.querySelectorAll('#predioAmenidades input:checked')].map(i=>i.value);
+      novoEmp.areasComuns = { andares: moldeAreasComuns(numAndares, numGaragens, amenidades) };
+    }
+    if (tipoSelecionado==="casa" || tipoSelecionado==="predio"){
+      novoEmp.equipamentos = { andares: moldeEquipamentos() };
+    }
     estado.empreendimentos.push(novoEmp);
     empAtualId = novoEmp.id; unidAtualId = unidId; andarAtualId = null; abertos = {};
     salvarEstado();
     document.getElementById("modalEmp").classList.remove("aberto");
     renderTudo();
     toast("Empreendimento criado");
-  };
+  });
 
-  document.getElementById("btnNovaUnid").addEventListener("click", ()=>{
+  document.getElementById("btnNovaUnid").addEventListener("click", async ()=>{
     const emp = getEmp(empAtualId);
-    const nome = prompt("Nome da nova unidade:", "Unidade " + (emp.unidades.length+1));
+    const nome = await pedirTexto("Nova unidade", "Unidade " + (emp.unidades.length+1));
     if (!nome) return;
-    const novaUnid = { id: gerarId("un"), nome: nome.trim(), andares: moldeUnidade(emp.tipo) };
+    const novaUnid = { id: gerarId("un"), nome: nome, andares: moldeUnidade(emp.tipo) };
     emp.unidades.push(novaUnid);
     unidAtualId = novaUnid.id; andarAtualId = null; abertos = {};
     salvarEstado();
@@ -592,11 +687,11 @@
     toast("Unidade adicionada");
   });
 
-  document.getElementById("btnNovoAndar").addEventListener("click", ()=>{
+  document.getElementById("btnNovoAndar").addEventListener("click", async ()=>{
     const cont = getUnidadeOuComum();
-    const nome = prompt("Nome do novo andar/setor:", "");
-    if (!nome || !nome.trim()) return;
-    const novoAnd = novoAndar(nome.trim(), []);
+    const nome = await pedirTexto("Novo andar/setor", "");
+    if (!nome) return;
+    const novoAnd = novoAndar(nome, []);
     cont.andares.push(novoAnd);
     andarAtualId = novoAnd.id; abertos = {};
     salvarEstado();
@@ -611,11 +706,13 @@
     document.getElementById("ambModalTitulo").textContent = ambienteExistente ? "Editar ambiente" : "Novo ambiente";
     document.getElementById("ambNomeInput").value = ambienteExistente ? ambienteExistente.nome : "";
     document.getElementById("ambObsInput").value = ambienteExistente ? (ambienteExistente.observacao||"") : "";
-    const emp = getEmp(empAtualId);
     const quick = document.getElementById("ambQuickGrid");
     quick.innerHTML = "";
-    if (emp.tipo==="predio" && unidAtualId==="__areas_comuns__"){
-      for (const s of AREAS_COMUNS_SUGESTOES){
+    let sugestoes = null;
+    if (unidAtualId==="__areas_comuns__") sugestoes = AREAS_COMUNS_SUGESTOES;
+    if (unidAtualId==="__equipamentos__") sugestoes = EQUIPAMENTOS_SUGESTOES;
+    if (sugestoes){
+      for (const s of sugestoes){
         const b = document.createElement("button");
         b.className = "quick-btn"; b.textContent = s; b.type="button";
         b.onclick = ()=> document.getElementById("ambNomeInput").value = s;
@@ -649,6 +746,7 @@
   document.getElementById("listaAmbientes").addEventListener("click", async (e)=>{
     const t = e.target;
     const andar = getAndarAtual();
+    if (!andar) return;
 
     const toggleId = t.closest("[data-toggle]");
     if (toggleId){
@@ -660,16 +758,36 @@
     const editarAmbEl = t.closest("[data-editar-amb]");
     if (editarAmbEl){
       const amb = andar.ambientes.find(a=>a.id===editarAmbEl.getAttribute("data-editar-amb"));
+      if (!amb) return;
       abrirModalAmbiente(amb);
+      return;
+    }
+    const excluirAmbEl = t.closest("[data-excluir-amb]");
+    if (excluirAmbEl){
+      const ambId = excluirAmbEl.getAttribute("data-excluir-amb");
+      const amb = andar.ambientes.find(a=>a.id===ambId);
+      if (!amb) return;
+      const totalFotos = amb.paredes.reduce((s,p)=>s+p.fotos.length,0);
+      if (totalFotos > 0){
+        await avisar("Não dá pra excluir", 'O ambiente "'+amb.nome+'" já tem '+totalFotos+' foto(s)/vídeo(s) registrados. Pra proteger o que já foi fotografado, só dá pra excluir ambiente que está zerado — apaga as fotos dele primeiro se quiser mesmo assim.');
+        return;
+      }
+      const ok = await pedirConfirmacao("Excluir ambiente", 'Excluir "'+amb.nome+'"? Ele está zerado (sem fotos), então não perde registro nenhum.', "Excluir");
+      if (!ok) return;
+      andar.ambientes = andar.ambientes.filter(a=>a.id!==ambId);
+      salvarEstado();
+      renderProgresso(); renderAmbientes();
+      toast("Ambiente excluído");
       return;
     }
     const renomearEl = t.closest("[data-renomear]");
     if (renomearEl){
       const [ambId, paredeId] = renomearEl.getAttribute("data-renomear").split("|");
       const amb = andar.ambientes.find(a=>a.id===ambId);
-      const parede = amb.paredes.find(p=>p.id===paredeId);
-      const novo = prompt("Nome deste ponto de registro:", parede.nome);
-      if (novo && novo.trim()){ parede.nome = novo.trim(); salvarEstado(); renderAmbientes(); }
+      const parede = amb && amb.paredes.find(p=>p.id===paredeId);
+      if (!parede) return;
+      const novo = await pedirTexto("Nome deste ponto de registro", parede.nome);
+      if (novo){ parede.nome = novo; salvarEstado(); renderAmbientes(); }
       return;
     }
     const addEl = t.closest("[data-add]");
@@ -689,10 +807,12 @@
     const delEl = t.closest("[data-del]");
     if (delEl){
       const [ambId, paredeId, fotoId] = delEl.getAttribute("data-del").split("|");
-      if (!confirm("Excluir este registro?")) return;
+      const ok = await pedirConfirmacao("Excluir registro", "Excluir esta foto/vídeo?", "Excluir");
+      if (!ok) return;
       await idbDelete(fotoId);
       const amb = andar.ambientes.find(a=>a.id===ambId);
-      const parede = amb.paredes.find(p=>p.id===paredeId);
+      const parede = amb && amb.paredes.find(p=>p.id===paredeId);
+      if (!parede) return;
       parede.fotos = parede.fotos.filter(f=>f.id!==fotoId);
       salvarEstado();
       renderProgresso(); renderAmbientes();
@@ -702,10 +822,11 @@
     const addParedeEl = t.closest("[data-add-parede]");
     if (addParedeEl){
       const ambId = addParedeEl.getAttribute("data-add-parede");
-      const nome = prompt("Nome deste ponto de registro novo:", "Parede " + (andar.ambientes.find(a=>a.id===ambId).paredes.length+1));
-      if (nome === null || !nome.trim()) return;
       const amb = andar.ambientes.find(a=>a.id===ambId);
-      amb.paredes.push(novaParede(nome.trim()));
+      if (!amb) return;
+      const nome = await pedirTexto("Novo ponto de registro", "Parede " + (amb.paredes.length+1));
+      if (!nome) return;
+      amb.paredes.push(novaParede(nome));
       salvarEstado();
       renderProgresso(); renderAmbientes();
       return;
@@ -720,9 +841,10 @@
 
   async function abrirLightbox(ambId, paredeId, fotoId){
     const andar = getAndarAtual();
-    const amb = andar.ambientes.find(a=>a.id===ambId);
-    const parede = amb.paredes.find(p=>p.id===paredeId);
-    const foto = parede.fotos.find(f=>f.id===fotoId);
+    const amb = andar && andar.ambientes.find(a=>a.id===ambId);
+    const parede = amb && amb.paredes.find(p=>p.id===paredeId);
+    const foto = parede && parede.fotos.find(f=>f.id===fotoId);
+    if (!foto) { toast("Esse registro não existe mais"); return; }
     const blob = await idbGet(fotoId);
     const url = URL.createObjectURL(blob); objectUrls.push(url);
     const midia = document.getElementById("lbMidia");
@@ -733,15 +855,16 @@
     document.getElementById("lightbox").dataset.alvo = ambId + "|" + paredeId + "|" + fotoId;
     document.getElementById("lightbox").classList.add("aberto");
   }
-  document.getElementById("lbBtnNota").addEventListener("click", ()=>{
+  document.getElementById("lbBtnNota").addEventListener("click", async ()=>{
     const [ambId, paredeId, fotoId] = document.getElementById("lightbox").dataset.alvo.split("|");
     const andar = getAndarAtual();
-    const amb = andar.ambientes.find(a=>a.id===ambId);
-    const parede = amb.paredes.find(p=>p.id===paredeId);
-    const foto = parede.fotos.find(f=>f.id===fotoId);
-    const nova = prompt("Observação deste registro:", foto.nota || "");
-    if (nova === null) return;
-    foto.nota = nova.trim();
+    const amb = andar && andar.ambientes.find(a=>a.id===ambId);
+    const parede = amb && amb.paredes.find(p=>p.id===paredeId);
+    const foto = parede && parede.fotos.find(f=>f.id===fotoId);
+    if (!foto) return;
+    const nova = await pedirTexto("Observação deste registro", foto.nota || "");
+    if (nova===null) return;
+    foto.nota = nova;
     salvarEstado();
     document.getElementById("lbNota").textContent = foto.nota ? ("Obs.: " + foto.nota) : "";
     renderAmbientes();
@@ -757,7 +880,7 @@
   document.getElementById("inputFoto").addEventListener("change", async (e)=>{
     const file = e.target.files[0];
     e.target.value = "";
-    const alvo = pendente; // captura local ANTES de qualquer await — pendente global libera na hora
+    const alvo = pendente;
     pendente = null;
     if (!file || !alvo) return;
     const quem = document.getElementById("quemSelect").value;
@@ -768,13 +891,14 @@
       const parede = amb && amb.paredes.find(p=>p.id===alvo.paredeId);
       if (!parede){ toast("Esse ambiente mudou — abre de novo e tenta outra vez"); return; }
       if (ehVideo && file.size > 80*1024*1024){
-        if (!confirm("Esse vídeo tem " + Math.round(file.size/1024/1024) + "MB — pode demorar ou pesar no celular. Salvar mesmo assim?")) return;
+        const ok = await pedirConfirmacao("Vídeo grande", "Esse vídeo tem " + Math.round(file.size/1024/1024) + "MB — pode demorar ou pesar no celular. Salvar mesmo assim?", "Salvar mesmo assim");
+        if (!ok) return;
       }
       const blob = ehVideo ? file : await compressImage(file);
       if (alvo.replaceId){
         const foto = parede.fotos.find(f=>f.id===alvo.replaceId);
         const novoId = novoIdFoto(quem);
-        await idbPut(novoId, blob); // grava o novo ANTES de apagar o antigo — se falhar, o antigo continua intacto
+        await idbPut(novoId, blob);
         await idbDelete(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
         toast("Atualizado");
@@ -806,6 +930,7 @@
       for (const emp of estado.empreendimentos){
         for (const u of emp.unidades) for (const an of u.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
         if (emp.areasComuns) for (const an of emp.areasComuns.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
+        if (emp.equipamentos) for (const an of emp.equipamentos.andares) for (const amb of an.ambientes) for (const p of amb.paredes) yield p;
       }
     }
     for (const p of todasParedes()){
@@ -833,16 +958,16 @@
       const texto = await file.text();
       const pacote = JSON.parse(texto);
       if (pacote.versao !== 3 || !pacote.estado || !Array.isArray(pacote.estado.empreendimentos)){
-        alert("Esse arquivo de backup é de uma versão antiga ou diferente do app — não dá pra importar direto aqui. Me manda que eu ajusto.");
+        await avisar("Backup incompatível", "Esse arquivo de backup é de uma versão antiga ou diferente do app — não dá pra importar direto aqui. Me manda que eu ajusto.");
         return;
       }
-      if (!confirm("Importar vai SOMAR este backup ao que já está aqui (não apaga o que já existe). Continuar?")) return;
+      const ok = await pedirConfirmacao("Importar backup", "Isso vai SOMAR este backup ao que já está aqui (não apaga o que já existe). Continuar?", "Importar");
+      if (!ok) return;
       const base64Map = pacote.midiaBase64 || {};
       for (const id in base64Map){
         const blob = dataURLToBlob(base64Map[id]);
         await idbPut(id, blob);
       }
-      // funde por id de empreendimento/unidade/andar/ambiente/parede; cria o que faltar
       for (const empOrigem of pacote.estado.empreendimentos){
         let empDestino = estado.empreendimentos.find(e=>e.id===empOrigem.id);
         if (!empDestino){ estado.empreendimentos.push(empOrigem); continue; }
@@ -855,6 +980,10 @@
           if (!empDestino.areasComuns) empDestino.areasComuns = empOrigem.areasComuns;
           else fundirAndares(empDestino.areasComuns.andares, empOrigem.areasComuns.andares);
         }
+        if (empOrigem.equipamentos){
+          if (!empDestino.equipamentos) empDestino.equipamentos = empOrigem.equipamentos;
+          else fundirAndares(empDestino.equipamentos.andares, empOrigem.equipamentos.andares);
+        }
       }
       sanearEstado(estado);
       salvarEstado();
@@ -862,13 +991,13 @@
       const nomes = estado.empreendimentos.map(e=>e.nome.trim().toLowerCase());
       const duplicado = nomes.find((n,i)=>nomes.indexOf(n)!==i);
       if (duplicado){
-        alert('Atenção: agora existem 2 empreendimentos chamados "' + duplicado + '" — provavelmente cada celular criou o dele antes de importar o do outro. São duas árvores separadas; me manda o backup que eu te ajudo a juntar.');
+        await avisar("Atenção — possível duplicata", 'Agora existem 2 empreendimentos chamados "' + duplicado + '" — provavelmente cada celular criou o dele antes de importar o do outro. São duas árvores separadas; me manda o backup que eu te ajudo a juntar.');
       } else {
         toast("Backup importado");
       }
     }catch(err){
       console.error(err);
-      alert("Não consegui ler esse arquivo de backup.");
+      await avisar("Erro", "Não consegui ler esse arquivo de backup.");
     }
   });
   function fundirAndares(destino, origem){
