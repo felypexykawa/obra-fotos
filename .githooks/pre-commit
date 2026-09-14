@@ -1,0 +1,5 @@
+#!/bin/sh
+# pre-commit — mesma régua do publicar.sh: nenhum commit entra com o app oco ou sem sintaxe.
+# Ligado por `git config core.hooksPath .githooks` (o publicar.sh liga sozinho na primeira vez).
+cd "$(git rev-parse --show-toplevel)" || exit 1
+node checks-app.js index.html || { echo "commit ABORTADO pelo checks-app.js"; exit 1; }

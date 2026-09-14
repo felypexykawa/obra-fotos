@@ -1,1 +1,4 @@
 _teste/
+
+# copias de seguranca do publicar.sh (hoje ficam fora do repo; isto e so seguranca extra)
+.pub-*.bak

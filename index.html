@@ -63,7 +63,8 @@
   .btn-add-foto{width:74px;height:74px;border-radius:8px;border:2px dashed #c9c5bc;background:transparent;color:var(--sub);font-size:11px;}
   .btn-add-parede{margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1px dashed var(--sub);background:transparent;color:var(--sub);font-size:13px;}
   .rodape-acoes{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;padding:8px 10px;}
-  .rodape-acoes button{flex:1;padding:11px 0;border-radius:8px;border:1px solid var(--line);background:#fafaf8;font-size:13px;font-weight:600;color:var(--ink);}
+  .rodape-acoes button{flex:1;padding:11px 0;border-radius:8px;border:1px solid var(--line);background:#fafaf8;font-size:12px;font-weight:600;color:var(--ink);}
+  .rodape-acoes button.ligado{background:#e6f2e6;border-color:#8fbf8f;}
   .regra-box{margin:0 10px 10px;padding:10px 12px;background:#fff8ec;border:1px solid #eadfc0;border-radius:8px;font-size:12px;line-height:1.5;color:#5a4a20;}
   .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:50;}
   .lightbox.aberto{display:flex;}
@@ -73,7 +74,7 @@
   .lightbox .lb-acoes{margin-top:12px;display:flex;gap:10px;}
   .lightbox .lb-acoes button{padding:8px 14px;border-radius:8px;border:none;font-size:13px;background:#333;color:#fff;}
   .lightbox .lb-fechar{position:absolute;top:14px;right:16px;color:#fff;font-size:26px;background:none;border:none;}
-  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:95;}
   .toast.show{opacity:1;}
   .modal-fundo{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:70;padding:20px;overflow-y:auto;}
   .modal-fundo.aberto{display:flex;}
@@ -88,6 +89,8 @@
   .tipo-btn.sel{border-color:var(--accent);background:#fdece9;color:var(--accent-dark);font-weight:600;}
   .quick-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
   .quick-btn{padding:6px 10px;border-radius:14px;border:1px solid var(--line);background:#f3f1ec;font-size:12px;}
+  .cap-opcao{display:block;width:100%;padding:14px 12px;margin:8px 0;border-radius:10px;border:1px solid var(--line);background:#f6f6f6;font-size:15px;text-align:left;font-family:inherit;}
+  .cap-opcao:active{background:#e8e8e8;}
   .modal-acoes{display:flex;gap:8px;margin-top:16px;}
   .modal-acoes button{flex:1;padding:10px;border-radius:8px;border:none;font-size:14px;font-weight:600;}
   .modal-acoes .cancelar{background:#eee;color:#555;}
@@ -104,6 +107,7 @@
 <header>
   <h1 id="tituloTopo">Fotos da Obra</h1>
   <p id="subtituloTopo">registro por ambiente</p>
+  <div id="buildTag" style="opacity:.65;font-size:11px;margin-top:2px;"></div>
 </header>
 
 <div class="modo-bar">
@@ -162,9 +166,22 @@
 <div class="rodape-acoes">
   <button id="btnExportar" type="button">⬇ Exportar backup</button>
   <button id="btnImportar" type="button">⬆ Importar backup</button>
+  <button id="btnCopiaCelular" type="button">📥 Cópia no celular</button>
 </div>
 <input type="file" id="inputImportar" accept="application/json" multiple hidden>
 <input type="file" id="inputFoto" accept="image/*,video/*" hidden>
+<input type="file" id="inputFotoCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="inputVideoCam" accept="video/*" capture="environment" hidden>
+<div class="modal-fundo" id="modalCaptura">
+  <div class="modal">
+    <h3>Registrar</h3>
+    <button type="button" class="cap-opcao" id="capFoto">📷 Tirar foto agora</button>
+    <button type="button" class="cap-opcao" id="capVideo">🎥 Gravar vídeo agora</button>
+    <button type="button" class="cap-opcao" id="capGaleria">🖼️ Escolher da galeria</button>
+    <p id="capNota" style="font-size:12px;color:#666;margin:6px 2px 0;"></p>
+    <div class="modal-acoes"><button type="button" class="cancelar" id="capCancelar">Cancelar</button></div>
+  </div>
+</div>
 
 <div class="lightbox" id="lightbox">
   <button class="lb-fechar" id="lbFechar" type="button">×</button>
@@ -177,6 +194,7 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="avisoVersao" style="display:none;position:fixed;bottom:118px;left:10px;right:10px;background:#1f4e79;color:#fff;padding:10px 40px 10px 12px;border-radius:8px;font-size:13px;z-index:85;box-shadow:0 2px 10px rgba(0,0,0,.3);">Tem uma versão nova do app. <button id="btnRecarregar" type="button" style="margin-left:8px;padding:6px 10px;border:0;border-radius:6px;background:#fff;color:#1f4e79;font-weight:600;">Atualizar agora</button><button id="btnFecharAviso" type="button" aria-label="Fechar" style="position:absolute;top:6px;right:8px;border:0;background:transparent;color:#fff;font-size:18px;line-height:1;">×</button></div>
 <div id="progressoVideo" style="display:none;position:fixed;top:0;left:0;right:0;background:#222;color:#fff;font-size:13px;padding:10px 14px;text-align:center;z-index:80;"></div>
 
 <!-- Página inicial: escolha do modo (só aparece quando ainda não há modo salvo) -->
@@ -305,9 +323,14 @@
 
   const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const AREAS_COMUNS_SUGESTOES = ["Hall","Corredor","Garagem","Salão de Festas","Salão de Jogos","Academia","Piscina","Playground","Cinema","Escada","Elevador"];
+  const UNIDADE_SUGESTOES = ["Telhado","Caixa d'água","Laje de cobertura","Calhas e rufos","Muro de divisa","Cisterna / poço","Fossa / caixa de gordura","Quadro elétrico","Padrão de entrada (Celesc)","Área de serviço","Churrasqueira","Piscina","Sacada","Garagem"];
   const EQUIPAMENTOS_SUGESTOES = ["Placas Solares","Gerador","Bomba de Cisterna","Bomba de Drenagem","Elevador","Bomba de Piscina","Bomba de Cascata","Câmeras"];
 
   // ---------- Etapas da obra (validadas pelo Felype em 10/09) ----------
+  // carimbo de versão: gravado pelo publicar.sh a partir do relógio (nunca à mão). "dev" = cópia local.
+  const BUILD_TAG='14/09 13h14'; const BUILD_TS=1789402469725;
+  let homonimosCasados = 0; // declarado aqui em cima: a junção roda já na carga (absorção da chave antiga)
+  let irmaosJuntados = { unidades: 0, outros: 0 }; // idem: a desduplicação roda na carga
   const ETAPAS_BASE = ["Terreno / Preparação","Fundação","Estrutura","Alvenaria / Vedação","Cobertura","Instalações","Revestimento / Reboco","Esquadrias","Acabamento","Entrega / Habite-se","Pós-obra"];
   const ETAPAS_PREDIO_EXTRA = ["Fachada","Elevadores","Áreas Comuns"];
   const ETAPA_MANUTENCAO = "Manutenção";
@@ -390,6 +413,9 @@
     {nome:"Jardim (fundos)",paredes:4}, {nome:"Calçada Fundos",paredes:4}, {nome:"Lavanderia",paredes:4}, {nome:"Escada",paredes:4},
     {nome:"Área Social",paredes:4}, {nome:"Lavabo",paredes:4}, {nome:"Calçada Frente",paredes:4}, {nome:"Fachada",paredes:4}, {nome:"Garagem",paredes:4}
   ];
+  // Cobertura da casa: telhado, caixa d'água, laje — Felype (14/09): "quero tirar foto do telhado onde fizemos
+  // regularização, depois impermeabilização, depois na caixa d'água" e só tinha os ambientes internos.
+  const ROOMS_CASA_COBERTURA = [ {nome:"Telhado"}, {nome:"Caixa d'água"}, {nome:"Laje de cobertura"}, {nome:"Calhas e rufos"}, {nome:"Platibanda"} ];
   const ROOMS_CASA_2PAV = [
     {nome:"Suíte 1",paredes:4}, {nome:"BWC 1",paredes:4}, {nome:"Escada",paredes:4}, {nome:"BWC 2",paredes:4}, {nome:"Circulação",paredes:4},
     {nome:"Suíte Principal",paredes:4}, {nome:"Suíte 3",paredes:4}, {nome:"BWC 3",paredes:4}, {nome:"Varanda",paredes:4}
@@ -405,7 +431,7 @@
       return [ novoAndar("Terreno", [ {nome:"Frente"}, {nome:"Lateral Esquerda"}, {nome:"Lateral Direita"}, {nome:"Fundos"} ], b) ];
     }
     if (tipo==="casa"){
-      return [ novoAndar("Térreo", ROOMS_CASA_PADRAO, b), novoAndar("2° Pavimento", ROOMS_CASA_2PAV, b) ];
+      return [ novoAndar("Térreo", ROOMS_CASA_PADRAO, b), novoAndar("2° Pavimento", ROOMS_CASA_2PAV, b), novoAndar("Cobertura", ROOMS_CASA_COBERTURA, b) ];
     }
     return [ novoAndar("Único", ROOMS_APTO, b) ];
   }
@@ -814,6 +840,11 @@
     const foto = acharFotoPorId(job.fotoId);
     if (!foto || !foto.compactando) return; // apagada ou refeita antes de chegar a vez
     if (foto.comprimido){ foto.compactando = false; salvarEstado(); renderAmbientes(); return; } // marca voltou por engano: já está compactado
+    // tentativa contada ANTES de começar: se o celular matar o app no meio duas vezes (vídeo longo em aparelho
+    // fraco), na terceira abertura fica o original em vez de morrer de novo — nunca laço infinito
+    foto.tentativas = (foto.tentativas || 0) + 1;
+    if (foto.tentativas > 2){ foto.compactando = false; salvarEstado(); toast("Vídeo ficou no original (maior, ocupa mais espaço): a compactação não completou 2 vezes — vídeo longo pra este celular"); renderAmbientes(); return; }
+    salvarEstado();
     const original = job.arquivo || await idbGet(job.fotoId);
     if (!original){ foto.compactando = false; salvarEstado(); renderAmbientes(); return; }
     const legado = !!job.promessaLegada;
@@ -875,7 +906,19 @@
   function sanearEstado(st){
     st.empreendimentos = (st.empreendimentos||[]).filter(e => e && e.id).map(e => {
       e.unidades = Array.isArray(e.unidades) ? e.unidades : [];
-      e.unidades.forEach(u => { u.andares = Array.isArray(u.andares) ? u.andares : []; });
+      e.unidades.forEach(u => {
+        u.andares = Array.isArray(u.andares) ? u.andares : [];
+        // casa cadastrada antes de 14/09 ganha o nível Cobertura (telhado, caixa d'água) UMA vez — marca na unidade.
+        // Se a pessoa apagar (lápide) ou renomear, ele não volta; e o id é conferido antes do nome, para nunca nascer
+        // um gêmeo com o mesmo id (duas abas acesas, ambientes inalcançáveis).
+        if (e.tipo === "casa" && !u.coberturaAplicada){
+          const cob = novoAndar("Cobertura", ROOMS_CASA_COBERTURA, slug(u.id));
+          const tem = u.andares.some(a => a.id === cob.id || nomeNorm(a.nome) === "cobertura");
+          const lapide = (st.removidos||[]).some(r => r.id === cob.id);
+          if (!tem && !lapide) u.andares.push(cob);
+          u.coberturaAplicada = true;
+        }
+      });
       if (e.areasComuns && !Array.isArray(e.areasComuns.andares)) e.areasComuns.andares = [];
       if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0,0,false, e.id) };
       if (e.equipamentos && !Array.isArray(e.equipamentos.andares)) e.equipamentos.andares = [];
@@ -895,15 +938,35 @@
   function lapides(...sts){ const t = new Set(); for (const st of sts) for (const r of (st && st.removidos) || []) t.add(r.id); return t; }
   function contarFotos(st){ let n = 0; for (const e of st.empreendimentos||[]){ const conts = [].concat(e.unidades||[], e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]); for (const c of conts) for (const an of c.andares||[]) for (const amb of an.ambientes||[]) for (const p of amb.paredes||[]) n += (p.fotos||[]).length; } return n; }
   function carregarEstado(){
+    let raw = null;
+    try{ raw = localStorage.getItem(LS_KEY); if (!raw) raw = localStorage.getItem(LS_KEY_ANTIGA); }catch(e){} // primeira abertura desta versão: parte do que a antiga gravou
+    if (!raw) return estadoPadrao();
+    // recomeçar do zero com árvore gravada: SEMPRE guarda o bruto numa chave de resgate e AVISA (o dono precisa saber;
+    // sem aviso, ele abre o app, vê a casa de fábrica e acha que perdeu tudo — e a gravação seguinte apagaria mesmo)
+    const recomecar = (motivo)=>{
+      try{ localStorage.setItem(LS_KEY + "_resgate", raw); }catch(e2){}
+      setTimeout(()=>avisar("Não consegui ler os dados gravados", "O app abriu com o cadastro de fábrica porque não conseguiu ler o que estava gravado (" + motivo + "). Os dados NÃO foram apagados: ficaram numa cópia de resgate neste aparelho. Não cadastre nada por cima — mande uma mensagem pro Claude com esta tela que ele recupera."), 900);
+      return estadoPadrao();
+    };
+    let bruto;
+    try{ bruto = JSON.parse(raw); }
+    catch(e){ console.error("estado ilegível, recomeçando", e); return recomecar("texto ilegível"); }
     try{
-      let raw = localStorage.getItem(LS_KEY);
-      if (!raw) raw = localStorage.getItem(LS_KEY_ANTIGA); // primeira abertura desta versão: parte do que a antiga gravou
-      if (!raw) return estadoPadrao();
-      const st = sanearEstado(JSON.parse(raw));
-      if (!st.empreendimentos.length) return estadoPadrao();
+      const st = sanearEstado(bruto);
+      if (!st.empreendimentos.length) return (Array.isArray(bruto.empreendimentos) && bruto.empreendimentos.length) ? recomecar("cadastro sem identificação") : estadoPadrao();
       if (typeof st.revisao !== "number") st.revisao = 0;
+      desduplicarNomes(st, lapides(st)); // dado antigo com irmãos de nome igual vira um só (fotos preservadas)
       return st;
-    }catch(e){ console.error("estado corrompido, recomecando", e); return estadoPadrao(); }
+    }catch(e){
+      // defeito do CÓDIGO de carga (não do dado): usa a árvore como está gravada. Recomeçar do zero aqui apagaria
+      // as fotos do usuário na gravação seguinte — e a faxina comeria os arquivos órfãos 10 min depois.
+      console.error("falha ao preparar o estado gravado; usando como está", e);
+      try{
+        const st = JSON.parse(raw); st.empreendimentos = Array.isArray(st.empreendimentos) ? st.empreendimentos.filter(x => x && x.id) : [];
+        if (typeof st.revisao !== "number") st.revisao = 0;
+        return st.empreendimentos.length ? st : recomecar("cadastro sem identificação");
+      }catch(e3){ return recomecar("defeito na leitura"); }
+    }
   }
   function salvarEstado(){
     try{
@@ -913,13 +976,22 @@
       // (toda edição grava na hora), então os campos ficam os nossos; só o que falta entra.
       const carimboDisco = localStorage.getItem(LS_CARIMBO) || "";
       if (carimboDisco && carimboDisco !== (estado.carimbo||"") && carimboDisco !== carimboJaUnido){
-        try{ const outro = sanearEstado(JSON.parse(localStorage.getItem(LS_KEY))); fundirEstados(estado, outro); estado.revisao = Math.max(estado.revisao||0, outro.revisao||0); carimboJaUnido = carimboDisco; }catch(e){}
+        try{ const outro = sanearEstado(JSON.parse(localStorage.getItem(LS_KEY))); const r = fundirEstados(estado, outro); estado.revisao = Math.max(estado.revisao||0, outro.revisao||0); carimboJaUnido = carimboDisco; if (r.irmaos.unidades) avisarIrmaos(r.irmaos.unidades); }catch(e){}
       }
-      estado.revisao = (estado.revisao||0) + 1;
+      const revAntes = estado.revisao||0, carimboAntes = estado.carimbo||"";
+      const discoCarimbo = localStorage.getItem(LS_CARIMBO), discoRev = localStorage.getItem(LS_REV);
+      estado.revisao = revAntes + 1;
       estado.carimbo = gerarId("g");
       localStorage.setItem(LS_CARIMBO, estado.carimbo); // carimbo e revisão antes da árvore: quem receber o aviso da árvore já vê os dois
       localStorage.setItem(LS_REV, String(estado.revisao));
-      localStorage.setItem(LS_KEY, JSON.stringify(estado));
+      try{ localStorage.setItem(LS_KEY, JSON.stringify(estado)); }
+      catch(e){
+        // a árvore não coube: carimbo e revisão voltam (no disco e na memória), senão o disco fica à frente da árvore
+        // e o guarda de "outra aba gravou" desarma
+        try{ if (discoCarimbo === null) localStorage.removeItem(LS_CARIMBO); else localStorage.setItem(LS_CARIMBO, discoCarimbo); if (discoRev === null) localStorage.removeItem(LS_REV); else localStorage.setItem(LS_REV, discoRev); }catch(e2){}
+        estado.revisao = revAntes; estado.carimbo = carimboAntes;
+        throw e;
+      }
       return true;
     }catch(e){
       console.error(e);
@@ -927,6 +999,8 @@
       return false;
     }
   }
+  // duas unidades com o mesmo nome (duas abas ou dois celulares passaram pela guarda) viraram uma: nunca em silêncio
+  function avisarIrmaos(n){ setTimeout(()=>avisar("Unidades juntadas", n + " unidade(s) com o mesmo nome de outra foram juntadas numa só (as fotos das duas ficaram juntas). Se eram imóveis diferentes, renomeie e separe as fotos."), 300); }
   // memória volta a ser o que está gravado (depois de uma gravação que falhou)
   function reverterParaDisco(){ estado = carregarEstado(); renderTudo(); }
   // o que uma aba com a versão ANTIGA gravou (fotos novas) entra aqui; nunca substitui a árvore desta versão
@@ -937,7 +1011,7 @@
       if (localStorage.getItem("obraFotosV3Absorvido") === assinatura) return 0;
       const velho = sanearEstado(JSON.parse(raw));
       const antes = contarFotos(estado);
-      fundirEstados(estado, velho);
+      const r = fundirEstados(estado, velho); if (r.irmaos.unidades) avisarIrmaos(r.irmaos.unidades);
       localStorage.setItem("obraFotosV3Absorvido", assinatura);
       const ganho = contarFotos(estado) - antes;
       if (ganho > 0) salvarEstado();
@@ -981,8 +1055,9 @@
     // (idempotente: não gera ping-pong).
     const assinatura = ()=> JSON.stringify([estado.empreendimentos, estado.removidos]);
     const antesUniao = assinatura();
-    fundirEstados(estado, deles, { campos: true });
+    const r = fundirEstados(estado, deles, { campos: true });
     estado.revisao = Math.max(estado.revisao||0, deles.revisao||0);
+    if (r.irmaos.unidades) avisarIrmaos(r.irmaos.unidades);
     carimboJaUnido = carimbo;
     if (!getEmp(empAtualId)){ empAtualId = estado.empreendimentos[0].id; unidAtualId = contextoPadrao(getEmp(empAtualId)); andarAtualId = null; }
     else if (!getUnidadeOuComum()){ unidAtualId = contextoPadrao(getEmp(empAtualId)); andarAtualId = null; }
@@ -1312,6 +1387,7 @@
   document.getElementById("empCancelar").onclick = () => document.getElementById("modalEmp").classList.remove("aberto");
   document.getElementById("empConfirmar").addEventListener("click", ()=>{
     const nome = document.getElementById("empNomeInput").value.trim();
+    if (nome && !nomeLivre(estado.empreendimentos, nome)){ toast('Já existe um empreendimento chamado "' + nome + '" — use outro nome'); return; }
     if (!nome || !tipoSelecionado){ toast("Preenche o nome e escolhe o tipo"); return; }
     const unidId = gerarId("un");
     const novoEmp = { id: gerarId("emp"), nome, tipo: tipoSelecionado,
@@ -1346,6 +1422,7 @@
     const emp = getEmp(empAtualId);
     const nome = await pedirTexto("Nova unidade", "Unidade " + (emp.unidades.length+1));
     if (!nome) return;
+    if (!nomeLivre(emp.unidades, nome)){ await avisar("Nome repetido", 'Já existe uma unidade chamada "' + nome + '" neste empreendimento. Use outro nome: duas iguais confundem você e a junção entre celulares.'); return; }
     const idNova = gerarId("un");
     const novaUnid = { id: idNova, nome: nome, andares: moldeUnidade(emp.tipo, idNova) };
     emp.unidades.push(novaUnid);
@@ -1360,6 +1437,7 @@
     if (!cont) return;
     const nome = await pedirTexto("Novo andar/setor", "");
     if (!nome) return;
+    if (!nomeLivre(cont.andares, nome)){ await avisar("Nome repetido", 'Já existe um andar chamado "' + nome + '" aqui. Use outro nome.'); return; }
     const novoAnd = novoAndar(nome, []);
     cont.andares.push(novoAnd);
     andarAtualId = novoAnd.id; abertos = {};
@@ -1429,6 +1507,7 @@
     if (escolha==="Renomear"){
       const nome = await pedirTexto("Nome da unidade", unid.nome);
       if (!nome) return;
+      if (!nomeLivre(emp.unidades, nome, unid.id)){ await avisar("Nome repetido", 'Já existe outra unidade chamada "' + nome + '" neste empreendimento. Use outro nome: duas iguais confundem você e a junção entre celulares.'); return; }
       unid.nome = nome; salvarEstado(); renderTudo(); toast("Unidade renomeada"); return;
     }
     let total = 0; for (const an of unid.andares) total += contarFotosAndar(an);
@@ -1507,6 +1586,8 @@
     const andar = getAndarAtual();
     const nome = document.getElementById("andarNomeInput").value.trim();
     if (!andar || !nome){ toast("Dá um nome pro andar"); return; }
+    const contAndar = getUnidadeOuComum();
+    if (contAndar && !nomeLivre(contAndar.andares, nome, andar.id)){ toast('Já existe um andar chamado "' + nome + '" aqui — use outro nome'); return; }
     andar.nome = nome;
     salvarEstado();
     document.getElementById("modalAndar").classList.remove("aberto");
@@ -1549,6 +1630,9 @@
     let sugestoes = null;
     if (unidAtualId==="__areas_comuns__") sugestoes = AREAS_COMUNS_SUGESTOES;
     if (unidAtualId==="__equipamentos__") sugestoes = EQUIPAMENTOS_SUGESTOES;
+    if (!sugestoes) sugestoes = UNIDADE_SUGESTOES;
+    const andarSug = getAndarAtual();
+    if (sugestoes && andarSug) sugestoes = sugestoes.filter(sg => nomeLivre(andarSug.ambientes, sg, ambienteEditandoId));
     if (sugestoes){
       for (const s of sugestoes){
         const b = document.createElement("button");
@@ -1582,21 +1666,23 @@
     const obs = document.getElementById("ambObsInput").value.trim();
     const andar = getAndarAtual();
     if (!andar) return;
+    if (!nomeLivre(andar.ambientes, nome, ambienteEditandoId)){ toast('Já existe um ambiente chamado "' + nome + '" neste andar — use outro nome'); return; }
     let mensagem = "Ambiente adicionado";
     if (ambienteEditandoId){
       const amb = andar.ambientes.find(a=>a.id===ambienteEditandoId);
       if (!amb) return;
+      const destinoId = document.getElementById("ambAndarSelect").value;
+      const vaiMover = document.getElementById("ambAndarWrap").style.display !== "none" && destinoId && destinoId !== andar.id;
+      const cont = getUnidadeOuComum();
+      const destino = (vaiMover && cont) ? cont.andares.find(a=>a.id===destinoId) : null;
+      // toda recusa vem ANTES de mexer no ambiente (antes, o nome novo ficava na memória e ia pro disco depois)
+      if (destino && !nomeLivre(destino.ambientes, nome)){ toast('O andar "' + destino.nome + '" já tem um ambiente chamado "' + nome + '" — renomeie antes de mover'); return; }
       amb.nome = nome; amb.observacao = obs;
       mensagem = "Ambiente atualizado";
-      const destinoId = document.getElementById("ambAndarSelect").value;
-      if (document.getElementById("ambAndarWrap").style.display !== "none" && destinoId && destinoId !== andar.id){
-        const cont = getUnidadeOuComum();
-        const destino = cont.andares.find(a=>a.id===destinoId);
-        if (destino){
-          andar.ambientes = andar.ambientes.filter(a=>a.id!==amb.id);
-          destino.ambientes.push(amb);
-          mensagem = 'Movido pra "'+destino.nome+'"';
-        }
+      if (destino){
+        andar.ambientes = andar.ambientes.filter(a=>a.id!==amb.id);
+        destino.ambientes.push(amb);
+        mensagem = 'Movido pra "'+destino.nome+'"';
       }
     } else {
       andar.ambientes.push(novoAmbiente(nome, obs, 1));
@@ -1659,21 +1745,23 @@
       const parede = amb && amb.paredes.find(p=>p.id===paredeId);
       if (!parede) return;
       const novo = await pedirTexto("Nome deste ponto de registro", parede.nome);
-      if (novo){ parede.nome = novo; salvarEstado(); renderAmbientes(); }
+      if (!novo) return;
+      if (!nomeLivre(amb.paredes, novo, parede.id)){ toast('Já existe um ponto chamado "' + novo + '" neste ambiente — use outro nome'); return; }
+      parede.nome = novo; salvarEstado(); renderAmbientes();
       return;
     }
     const addEl = t.closest("[data-add]");
     if (addEl){
       const [ambId, paredeId] = addEl.getAttribute("data-add").split("|");
       pendente = { ambienteId: ambId, paredeId, replaceId: null };
-      document.getElementById("inputFoto").click();
+      abrirCaptura();
       return;
     }
     const retakeEl = t.closest("[data-retake]");
     if (retakeEl){
       const [ambId, paredeId, fotoId] = retakeEl.getAttribute("data-retake").split("|");
       pendente = { ambienteId: ambId, paredeId, replaceId: fotoId };
-      document.getElementById("inputFoto").click();
+      abrirCaptura();
       return;
     }
     const delEl = t.closest("[data-del]");
@@ -1702,6 +1790,7 @@
       if (!amb) return;
       const nome = await pedirTexto("Novo ponto de registro", "Parede " + (amb.paredes.length+1));
       if (!nome) return;
+      if (!nomeLivre(amb.paredes, nome)){ await avisar("Nome repetido", 'Já existe um ponto chamado "' + nome + '" neste ambiente. Use outro nome.'); return; }
       amb.paredes.push(novaParede(nome));
       salvarEstado();
       renderProgresso(); renderAmbientes();
@@ -1769,7 +1858,54 @@
     if (e.target.id==="lightbox"){ e.currentTarget.classList.remove("aberto"); document.getElementById("lbMidia").innerHTML = ""; }
   });
 
-  document.getElementById("inputFoto").addEventListener("change", async (e)=>{
+  // "+ Foto/Vídeo" pergunta primeiro: tirar agora (abre a câmera direto, sem passar pela galeria — a foto vai
+  // direto pro ponto certo, sem ficar solta no celular pra alguém lembrar de escolher depois), gravar, ou galeria.
+  // O clique no input de arquivo precisa acontecer DENTRO do toque no botão (senão o celular bloqueia o seletor).
+  // Cópia no celular (preferência DESTE aparelho, ligada por padrão): o que é tirado pela câmera do app não passa
+  // pela galeria — sem isto, a foto existiria só dentro do app (e no backup). Com isto, o original vai também
+  // para a pasta Download do celular, com nome que diz de onde é, e o Google Fotos/galeria do aparelho o vê.
+  const LS_COPIA = "obraFotosCopiaCelular";
+  function copiaLigada(){ try{ return localStorage.getItem(LS_COPIA) !== "0"; }catch(e){ return true; } }
+  function limparNome(t){ return String(t||"").normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 40) || "x"; }
+  function nomeDaCopia(alvo, file){
+    const emp = getEmp(empAtualId), cont = getUnidadeOuComum(), andar = getAndarAtual();
+    const amb = andar && andar.ambientes.find(a=>a.id===alvo.ambienteId); const par = amb && amb.paredes.find(p=>p.id===alvo.paredeId);
+    const contNome = unidAtualId==="__areas_comuns__" ? "Areas-comuns" : unidAtualId==="__equipamentos__" ? "Equipamentos" : (cont && cont.nome);
+    const d = new Date(), pad = x => String(x).padStart(2, "0");
+    const quando = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+    const ext = (file.name && /\.[A-Za-z0-9]{2,4}$/.test(file.name)) ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : (file.type.startsWith("video/") ? ".mp4" : ".jpg");
+    return ["FotosObra", limparNome(emp && emp.nome), limparNome(contNome), limparNome(andar && andar.nome), limparNome(amb && amb.nome), limparNome(par && par.nome), quando].join("_") + ext;
+  }
+  function guardarCopiaNoCelular(file, nome){
+    try{
+      const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = nome;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 120000);
+      return true;
+    }catch(e){ console.error(e); return false; }
+  }
+  function renderCopia(){
+    const b = document.getElementById("btnCopiaCelular"); const on = copiaLigada();
+    b.textContent = on ? "📥 Cópia no celular: ligada" : "📥 Cópia no celular: desligada"; b.classList.toggle("ligado", on);
+    document.getElementById("capNota").textContent = on ? "Tirada por aqui, a foto fica no app e uma cópia é mandada para a pasta Download do celular." : "Cópia no celular desligada: o que você tirar por aqui fica só no app e no backup.";
+  }
+  document.getElementById("btnCopiaCelular").addEventListener("click", async ()=>{
+    const on = copiaLigada();
+    if (on){
+      const ok = await pedirConfirmacao("Desligar a cópia no celular?", "Com a cópia desligada, foto ou vídeo tirado pela câmera do app fica SÓ dentro do app (e no backup que você exportar). Se o celular for perdido ou o navegador limpar os dados, some. Com a cópia ligada, o original vai também para a pasta Download do aparelho.", "Desligar");
+      if (!ok) return;
+    }
+    try{ localStorage.setItem(LS_COPIA, on ? "0" : "1"); }catch(e){}
+    renderCopia(); toast(on ? "Cópia no celular desligada" : "Cópia no celular ligada: cada foto tirada por aqui vai também para Download");
+  });
+  renderCopia();
+  function abrirCaptura(){ document.getElementById("modalCaptura").classList.add("aberto"); }
+  function fecharCaptura(){ document.getElementById("modalCaptura").classList.remove("aberto"); }
+  document.getElementById("capFoto").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputFotoCam").click(); });
+  document.getElementById("capVideo").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputVideoCam").click(); });
+  document.getElementById("capGaleria").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputFoto").click(); });
+  document.getElementById("capCancelar").addEventListener("click", ()=>{ fecharCaptura(); pendente = null; });
+  for (const id of ["inputFoto","inputFotoCam","inputVideoCam"]) document.getElementById(id).addEventListener("change", aoEscolherArquivo);
+  async function aoEscolherArquivo(e){
     const file = e.target.files[0];
     e.target.value = "";
     const alvo = pendente;
@@ -1779,7 +1915,11 @@
     const ehVideo = file.type.startsWith("video/");
     // a parede é re-resolvida por id depois de cada await: outra aba pode ter trocado a árvore no meio
     const acharParede = ()=>{ const an = getAndarAtual(); const a = an && an.ambientes.find(a=>a.id===alvo.ambienteId); return (a && a.paredes.find(p=>p.id===alvo.paredeId)) || null; };
-    if (!acharParede()){ toast("Esse ambiente mudou — abre de novo e tenta outra vez"); return; }
+    // veio da câmera do app (não da galeria, onde o arquivo já mora no celular): cópia no aparelho ANTES de qualquer
+    // recusa ou gravação — o que foi fotografado agora não existe em mais lugar nenhum
+    const daCamera = e.target.id !== "inputFoto";
+    const copiou = (daCamera && copiaLigada()) ? guardarCopiaNoCelular(file, nomeDaCopia(alvo, file)) : false;
+    if (!acharParede()){ toast(copiou ? "Esse ambiente mudou — a foto foi mandada para o Download do celular; abre de novo e adiciona pela galeria" : "Esse ambiente mudou — abre de novo e tenta outra vez"); return; }
     // sem WebCodecs, a rota antiga (canvas) precisa começar AGORA, dentro do toque — senão o celular bloqueia o áudio.
     // Se o fluxo abortar antes de agendar, o token cancela a rota antiga (senão ela rodaria até o fim com a faixa presa).
     const tokenLegado = { cancelado: false };
@@ -1790,8 +1930,8 @@
       let blob;
       if (ehVideo){
         if (file.size > 250e6){
-          const ok = await pedirConfirmacao("Vídeo muito grande", "Esse vídeo tem " + mb(file.size) + " — vai pesar no celular e a compactação pode falhar. Salvar mesmo assim?", "Salvar mesmo assim");
-          if (!ok){ abortarLegado(); return; }
+          const ok = await pedirConfirmacao("Vídeo muito grande", "Esse vídeo tem " + mb(file.size) + " — vai pesar no app e a compactação pode falhar." + (copiou ? " Uma cópia dele já foi mandada para a pasta Download do celular." : "") + " Salvar no app mesmo assim?", "Salvar mesmo assim");
+          if (!ok){ abortarLegado(); if (copiou) toast("Vídeo não entrou no app — a cópia está na pasta Download do celular"); return; }
         }
         blob = file; // o original entra JÁ; a compactação roda em segundo plano e troca o arquivo depois
       } else {
@@ -1809,7 +1949,7 @@
         antes = Object.assign({}, foto); fotoAlterada = foto; apagarDepois = alvo.replaceId;
         marcarRemovido(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
-        foto.compactando = ehVideo; foto.tamanho = blob.size; delete foto.comprimido;
+        foto.compactando = ehVideo; foto.tamanho = blob.size; delete foto.comprimido; foto.tentativas = 0;
         if (!foto.etapa) foto.etapa = etapaParaNovaFoto(); // foto antiga sem etapa ganha a atual ao ser refeita
         idGravado = novoId;
         msg = "Atualizado" + (ehVideo ? " · vídeo salvo, compactando em segundo plano" : "") + garantirVisivel(foto);
@@ -1831,19 +1971,24 @@
         }
         else { const p = acharParede(); if (p) p.fotos = p.fotos.filter(f=>f.id!==idGravado); }
         await idbDelete(idGravado);
+        if (copiou) avisar("A foto está fora do app", "Não coube no app, mas a foto foi mandada para a pasta Download do celular — confira lá. Libere espaço e adicione de novo pela galeria.");
         abortarLegado(); renderAmbientes();
         return;
       }
       if (apagarDepois) await idbDelete(apagarDepois);
-      toast(msg);
+      toast(msg + (copiou ? " · cópia mandada para Download" : ""));
       renderProgresso(); renderAmbientes();
+      avisarEspaco(); // o celular enche DURANTE o uso: reconfere depois de cada gravação, não só na abertura
       if (ehVideo && idGravado){ agendado = true; agendarCompactacao(idGravado, file, promessaLegada); }
     } catch(err){
       console.error(err);
       abortarLegado();
-      toast("Não consegui salvar");
+      const semEspaco = /quota|space|full/i.test(String(err && (err.name + " " + err.message)));
+      const causa = "O app não conseguiu gravar" + (semEspaco ? " (sem espaço no aparelho)" : "") + ". ";
+      await avisar("Não consegui salvar", causa + (copiou ? "A foto foi mandada para a pasta Download do celular — confira lá. Libere espaço (apague vídeos antigos ou exporte um backup) e adicione de novo pela galeria."
+        : (!daCamera ? "O arquivo continua na galeria do celular. Libere espaço e tenta de novo." : "Esta foto NÃO ficou guardada em lugar nenhum. Libere espaço (apague vídeos antigos ou exporte um backup) e tire de novo.")));
     }
-  });
+  }
 
   document.getElementById("quemSelect").addEventListener("change", ()=>{
     localStorage.setItem("obraFotosQuemPadrao", document.getElementById("quemSelect").value);
@@ -1909,7 +2054,7 @@
     if (!arquivos.length) return;
     const ok = await pedirConfirmacao("Importar backup", "Isso vai SOMAR " + (arquivos.length > 1 ? "estes " + arquivos.length + " arquivos" : "este backup") + " ao que já está aqui (não apaga o que já existe). Continuar?", "Importar");
     if (!ok) return;
-    let novasTotal = 0, juntados = 0, homonimos = 0, midiasGravadas = 0; const erros = [];
+    let novasTotal = 0, juntados = 0, homonimos = 0, midiasGravadas = 0, irmaosUnid = 0, irmaosOutros = 0; const erros = [];
     for (let i = 0; i < arquivos.length; i++){
       const file = arquivos[i];
       toast("Importando " + (arquivos.length > 1 ? "parte " + (i+1) + " de " + arquivos.length : "backup") + "…");
@@ -1922,6 +2067,7 @@
         sanearEstado(estado);
         if (!salvarEstado()){ erros.push(file.name + ": sem espaço para gravar"); break; }
         novasTotal += contarFotos(estado) - antesFotos; juntados += res.juntadosPorNome; homonimos += res.homonimos;
+        irmaosUnid += res.irmaos.unidades; irmaosOutros += res.irmaos.outros;
         // 2) depois os arquivos, só dos registros que existem (foto com lápide ou sem registro é pulada)
         const ids = new Set(); for (const p of todasParedes()) for (const f of p.fotos) ids.add(f.id);
         const base64Map = pacote.midiaBase64 || {};
@@ -1935,18 +2081,22 @@
     renderTudo();
     let msg = novasTotal + " registro(s) novo(s), " + midiasGravadas + " arquivo(s) de foto/vídeo gravado(s).";
     if (juntados) msg += " " + juntados + " empreendimento(s) com o mesmo nome foram juntados num só.";
+    if (irmaosUnid) msg += " ATENÇÃO: " + irmaosUnid + " unidade(s) com o mesmo nome de outra já cadastrada foram juntadas numa só (as fotos das duas ficaram juntas) — se eram imóveis diferentes, renomeie e separe as fotos.";
+    if (irmaosOutros) msg += " " + irmaosOutros + " andar(es)/ambiente(s)/ponto(s) de nome repetido foram juntados num só.";
     if (homonimos) msg += " " + homonimos + " ambiente(s) ou ponto(s) de nome repetido foram casados pela ordem — confira se as fotos caíram no lugar certo.";
     if (erros.length) msg += " Problemas: " + erros.join("; ") + ".";
-    if (juntados || homonimos || erros.length || arquivos.length > 1) await avisar("Backup importado", msg); else toast("Backup importado");
+    if (juntados || homonimos || irmaosUnid || irmaosOutros || erros.length || arquivos.length > 1) await avisar("Backup importado", msg); else toast("Backup importado");
   });
-  const nomeNorm = (s)=> String(s||"").trim().toLowerCase();
+  // nome "igual" = igual sem acento, sem caixa e sem espaço sobrando ("Térreo" == "TERREO" == " terreo ")
+  function nomeNorm(s){ return String(s||"").normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase().replace(/\s+/g, " "); }
+  // UMA guarda para todo criar/renomear: nenhum irmão pode ter o mesmo nome (a junção casa por nome)
+  function nomeLivre(lista, nome, idIgnorar){ return !(lista||[]).some(x => x.id !== idIgnorar && nomeNorm(x.nome) === nomeNorm(nome)); }
   // casa por id; senão por NOME (versões antigas geravam id aleatório, então o "Térreo" de um celular e o do
   // outro tinham ids diferentes e a junção duplicava a árvore inteira). O i-ésimo homônimo casa com o i-ésimo.
-  const fotosDeParede = p => ((p && p.fotos)||[]).length > 0;
-  const fotosDeAmb = a => ((a && a.paredes)||[]).some(fotosDeParede);
-  const fotosDeAndar = an => ((an && an.ambientes)||[]).some(fotosDeAmb);
-  const fotosDeUnid = u => ((u && u.andares)||[]).some(fotosDeAndar);
-  let homonimosCasados = 0;
+  function fotosDeParede(p){ return ((p && p.fotos)||[]).length > 0; }
+  function fotosDeAmb(a){ return ((a && a.paredes)||[]).some(fotosDeParede); }
+  function fotosDeAndar(an){ return ((an && an.ambientes)||[]).some(fotosDeAmb); }
+  function fotosDeUnid(u){ return ((u && u.andares)||[]).some(fotosDeAndar); }
   function casar(destino, origem){
     const usados = new Set();
     return (origem||[]).map(o => {
@@ -1960,6 +2110,36 @@
       if (d) usados.add(d);
       return [o, d || null];
     });
+  }
+  // dois irmãos com o mesmo nome (duas abas renomeando ao mesmo tempo, backup vindo de celular com duplicata,
+  // dado antigo) viram UM: o segundo é fundido no primeiro. É a mesma regra do casar, aplicada dentro da árvore.
+  function desduplicar(lista, fundir, chave, nivel){
+    chave = chave || (x => nomeNorm(x && x.nome));
+    const vistos = new Map(), fora = new Set();
+    for (const x of lista||[]){ const k = chave(x); if (!k) continue; if (vistos.has(k)){ fundir(vistos.get(k), x); fora.add(x); irmaosJuntados[nivel === "unidades" ? "unidades" : "outros"]++; } else vistos.set(k, x); }
+    return fora.size ? lista.filter(x => !fora.has(x)) : (lista||[]);
+  }
+  // primeiro por id (gêmeo de fábrica), depois por nome
+  function desduplicar2(lista, fundir, nivel){ return desduplicar(desduplicar(lista, fundir, x => x && x.id, nivel), fundir, null, nivel); }
+  function desduplicarNomes(st, tomb){
+    tomb = tomb || new Set();
+    irmaosJuntados = { unidades: 0, outros: 0 };
+    const juntaAndares = (d, o) => fundirAndares(d.andares = d.andares||[], o.andares||[], tomb);
+    st.empreendimentos = desduplicar2(st.empreendimentos, (d, o) => {
+      d.unidades = desduplicar2((d.unidades||[]).concat(o.unidades||[]), juntaAndares, "unidades");
+      for (const setor of ["areasComuns","equipamentos"]) if (o[setor]){ if (!d[setor]) d[setor] = o[setor]; else fundirAndares(d[setor].andares, o[setor].andares, tomb); }
+    });
+    for (const e of st.empreendimentos){
+      e.unidades = desduplicar2(e.unidades||[], juntaAndares, "unidades");
+      const conts = [].concat(e.unidades, e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]);
+      for (const c of conts){
+        c.andares = desduplicar2(c.andares||[], (d, o) => fundirAndares([d], [o], tomb));
+        for (const an of c.andares){
+          an.ambientes = desduplicar2(an.ambientes||[], (d, o) => fundirAndares([{id:"_", nome:"_", ambientes:[d]}], [{id:"_", nome:"_", ambientes:[o]}], tomb));
+          for (const amb of an.ambientes) amb.paredes = desduplicar2(amb.paredes||[], (d, o) => { const ids = new Set((d.fotos||[]).map(f=>f.id)); for (const f of o.fotos||[]) if (!ids.has(f.id) && !tomb.has(f.id)) (d.fotos = d.fotos||[]).push(f); });
+        }
+      }
+    }
   }
   // opts.campos: a origem é MAIS NOVA (gravação de outra aba desta versão) → nome/observação/etapa dela entram
   // nos itens casados por id. Sem opts.campos (backup, aba antiga): só acrescenta, campos ficam os nossos.
@@ -2034,8 +2214,9 @@
     // lápides se somam e valem para a árvore inteira: fotos E andares/ambientes/pontos/unidades excluídos
     const vistas = new Set((destino.removidos||[]).map(r=>r.id));
     for (const r of (origem.removidos||[])) if (!vistas.has(r.id)){ (destino.removidos = destino.removidos||[]).push(r); vistas.add(r.id); }
+    desduplicarNomes(destino, tomb);
     if (tomb.size) podarLapides(destino, tomb);
-    return { juntadosPorNome, homonimos: homonimosCasados };
+    return { juntadosPorNome, homonimos: homonimosCasados, irmaos: Object.assign({}, irmaosJuntados) };
   }
 
   renderTudo();
@@ -2070,14 +2251,46 @@
       return n;
     }catch(e){ console.warn("faxina falhou", e); return 0; }
   }
+  let ultimoAvisoEspaco = 0;
   async function avisarEspaco(){
     try{
       if (!navigator.storage || !navigator.storage.estimate) return;
-      const est = await navigator.storage.estimate();
-      if (est.quota && est.usage / est.quota > 0.85) toast("Armazenamento do celular quase cheio: " + mb(est.usage) + " de " + mb(est.quota) + " usados");
+      const est = await navigator.storage.estimate(); if (!est.quota) return;
+      const frac = est.usage / est.quota; if (frac <= 0.85) return;
+      if (frac > 0.95){
+        if (Date.now() - ultimoAvisoEspaco < 60*1000) return; ultimoAvisoEspaco = Date.now();
+        await avisar("Celular quase sem espaço", mb(est.usage) + " de " + mb(est.quota) + " usados. A próxima foto pode não gravar: exporte um backup e apague vídeos antigos, ou libere espaço no aparelho.");
+        return;
+      }
+      if (Date.now() - ultimoAvisoEspaco < 5*60*1000) return; ultimoAvisoEspaco = Date.now();
+      toast("Armazenamento do celular quase cheio: " + mb(est.usage) + " de " + mb(est.quota) + " usados");
     }catch(e){}
   }
   setTimeout(()=>{ varrerOrfaos(); avisarEspaco(); }, 3000);
+  // versão na tela + aviso quando o servidor tem uma MAIS NOVA (compara ts, nunca "diferente": cache atrasado
+  // do GitHub Pages devolvia versao.json velho e o app anunciava versão antiga como nova)
+  (function versaoNaTela(){
+    const el = document.getElementById("buildTag"); if (el) el.textContent = "v " + BUILD_TAG;
+    let avisado = false;
+    function checarVersao(){
+      if (BUILD_TAG === "dev" || avisado) return;
+      fetch("versao.json?n=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => {
+        if (!j || !j.ts || !(j.ts > BUILD_TS)){ try{ localStorage.removeItem("obraFotosAtualizacaoTentada"); }catch(e){} return; } // estamos na versão do servidor (ou o servidor é mais velho): nada a avisar
+        // servidor CONTINUA mais novo depois de um "Atualizar agora" recente: o cache do GitHub Pages ainda não
+        // entregou o arquivo novo (leva alguns minutos) — avisa e espera, em vez de banner em laço
+        let tentou = 0; try{ tentou = parseInt(localStorage.getItem("obraFotosAtualizacaoTentada")||"0", 10) || 0; }catch(e){}
+        if (tentou && Date.now() - tentou < 10*60*1000){ toast("A versão nova ainda está chegando — tenta de novo em alguns minutos"); return; }
+        avisado = true; document.getElementById("avisoVersao").style.display = "block";
+      }).catch(()=>{ try{ localStorage.removeItem("obraFotosAtualizacaoTentada"); }catch(e){} });
+    }
+    // o ?v= do "Atualizar agora" já cumpriu o papel: sai da URL, senão toda recarga manual repete a mesma URL (e o cache dela)
+    try{ if (/[?&]v=/.test(location.search)) history.replaceState(null, "", location.pathname); }catch(e){}
+    document.getElementById("btnFecharAviso").addEventListener("click", ()=>{ document.getElementById("avisoVersao").style.display = "none"; });
+    document.getElementById("btnRecarregar").addEventListener("click", ()=>{ try{ localStorage.setItem("obraFotosAtualizacaoTentada", String(Date.now())); }catch(e){} location.href = location.pathname + "?v=" + Date.now(); });
+    checarVersao();
+    document.addEventListener("visibilitychange", ()=>{ if (!document.hidden) checarVersao(); });
+    setInterval(checarVersao, 30*60*1000);
+  })();
   // gancho de teste (só no servidor local de desenvolvimento; não existe na versão publicada)
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__obraDebug = { setPendente:(p)=>{ pendente = p; }, comprimirVideoRapido, comprimirVideo, idbGet, idbTodasChaves, estado:()=>estado, acharFotoPorId, salvarEstado, fundirEstados, varrerOrfaos, LS_KEY, VIDEO_RAPIDO_OK };
 })();
