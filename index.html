@@ -128,6 +128,7 @@
   <button class="btn-mini" id="btnNovaUnid" type="button">+ Unidade</button>
 </div>
 <div class="ambiente-acoes" style="padding:6px 14px 0;">
+  <span id="btnEditarEmp">✎ editar empreendimento</span>
   <span id="btnEditarUnid">✎ editar unidade</span>
   <span id="btnUnidadesPorAndar" style="display:none;">🏢 gerar unidades por andar</span>
 </div>
@@ -328,7 +329,7 @@
 
   // ---------- Etapas da obra (validadas pelo Felype em 10/09) ----------
   // carimbo de versão: gravado pelo publicar.sh a partir do relógio (nunca à mão). "dev" = cópia local.
-  const BUILD_TAG='15/09 11h37'; const BUILD_TS=1789483038909;
+  const BUILD_TAG='15/09 12h20'; const BUILD_TS=1789485605439;
   let homonimosCasados = 0; // declarado aqui em cima: a junção roda já na carga (absorção da chave antiga)
   let irmaosJuntados = { unidades: 0, outros: 0 }; // idem: a desduplicação roda na carga
   const ETAPAS_BASE = ["Terreno / Preparação","Fundação","Estrutura","Alvenaria / Vedação","Cobertura","Instalações","Revestimento / Reboco","Esquadrias","Acabamento","Entrega / Habite-se","Pós-obra"];
@@ -1165,7 +1166,7 @@
     localStorage.setItem("obraFotosModo", modo);
     document.getElementById("modalModo").classList.remove("aberto");
     renderModo(); renderProgresso(); renderAmbientes();
-    if (ehExemploIntocado()) avisar("Antes de cadastrar", "\"Meu primeiro empreendimento\" é só um exemplo vazio — ele fica aí sem problema, não atrapalha nada. Se os dados deste imóvel já existem em outro celular ou computador, toque em \"Importar backup\" (no rodapé): eles entram do lado deste exemplo, sem apagar nada. Se é a primeira vez que este imóvel entra no app, toque em \"+ Empreendimento\" e cadastre com o nome real.");
+    mostrarAvisoExemplo();
   }));
   document.getElementById("etapaSelect").addEventListener("change", (e)=>{
     const an = getAndarAtual();
@@ -1509,6 +1510,34 @@
     toast(criadas ? (criadas + " unidade(s) criada(s)") : "Nada novo pra criar — já existiam");
   });
 
+  document.getElementById("btnEditarEmp").addEventListener("click", async ()=>{
+    const emp0 = getEmp(empAtualId);
+    const escolha = await pedirOpcao('Empreendimento "'+emp0.nome+'"', ["Renomear","Excluir"], "Renomear");
+    if (escolha===null) return;
+    if (escolha==="Renomear"){
+      const nome = await pedirTexto("Nome do empreendimento", emp0.nome);
+      if (!nome) return;
+      const empAgora1 = getEmp(emp0.id); if (!empAgora1){ toast("Esse empreendimento já não existe"); renderTudo(); return; }
+      if (!nomeLivre(estado.empreendimentos, nome, empAgora1.id)){ await avisar("Nome repetido", 'Já existe um empreendimento chamado "' + nome + '". Use outro nome: dois iguais confundem você e a junção entre celulares.'); return; }
+      empAgora1.nome = nome; salvarEstado(); renderTudo(); toast("Empreendimento renomeado");
+      return;
+    }
+    if (estado.empreendimentos.length === 1){ await avisar("Último empreendimento", "Esse é o único empreendimento cadastrado — sem ele não sobra nada pra mostrar. Crie outro antes de excluir este, ou renomeie em vez de excluir."); return; }
+    let total0 = 0; for (const an of todosAndaresDoEmp(emp0)) total0 += contarFotosAndar(an);
+    if (total0 > 0){ await avisar("Não dá pra excluir", 'O empreendimento "'+emp0.nome+'" tem '+total0+' foto(s)/vídeo(s). Pra proteger o registro, só dá pra excluir empreendimento zerado.'); return; }
+    const ok = await pedirConfirmacao("Excluir empreendimento", 'Excluir "'+emp0.nome+'"? Está zerado, não perde foto nenhuma.', "Excluir");
+    if (!ok) return;
+    const empAgora2 = getEmp(emp0.id);
+    if (!empAgora2){ toast("Esse empreendimento já não existe"); renderTudo(); return; }
+    if (estado.empreendimentos.length === 1){ toast("Não dá: ficaria sem nenhum empreendimento"); renderTudo(); return; }
+    let totalAgora = 0; for (const an of todosAndaresDoEmp(empAgora2)) totalAgora += contarFotosAndar(an);
+    if (totalAgora > 0){ toast("Chegou foto nesse empreendimento agora — não excluí"); renderTudo(); return; }
+    marcarRemovido(empAgora2.id);
+    estado.empreendimentos = estado.empreendimentos.filter(e=>e.id!==empAgora2.id);
+    if (empAtualId === empAgora2.id){ empAtualId = estado.empreendimentos[0].id; unidAtualId = contextoPadrao(getEmp(empAtualId)); andarAtualId = null; }
+    abertos = {};
+    salvarEstado(); renderTudo(); toast("Empreendimento excluído");
+  });
   document.getElementById("btnEditarUnid").addEventListener("click", async ()=>{
     const emp = getEmp(empAtualId);
     const unid = emp.unidades.find(u=>u.id===unidAtualId);
@@ -2206,7 +2235,10 @@
     let juntadosPorNome = 0; homonimosCasados = 0;
     const tomb = lapides(destino, origem);
     for (const [empOrigem, empDestino] of casar(destino.empreendimentos, origem.empreendimentos)){
-      if (tomb.has(empOrigem.id)) continue;
+      // foto vence a exclusão, igual em andar/unidade/ambiente/ponto (fotosDeAndar etc.): sem isto, excluir um
+      // empreendimento VAZIO neste aparelho vira lápide permanente (180 dias) que descarta em silêncio um
+      // empreendimento do MESMO id vindo de outro aparelho com fotos de verdade — achado antes de publicar (15/09)
+      if (tomb.has(empOrigem.id) && !todosAndaresDoEmp(empOrigem).some(fotosDeAndar)) continue;
       if (!empDestino){ destino.empreendimentos.push(empOrigem); continue; }
       if (empDestino.id !== empOrigem.id) juntadosPorNome++;
       else if (opts.campos && empOrigem.nome) empDestino.nome = empOrigem.nome;
@@ -2230,8 +2262,17 @@
     return { juntadosPorNome, homonimos: homonimosCasados, irmaos: Object.assign({}, irmaosJuntados) };
   }
 
+  // aviso do exemplo de fábrica: dispara UMA vez por aparelho, tanto para quem está escolhendo modo agora (evento
+  // acima) quanto para quem já tinha modo salvo de ANTES desta versão existir — sem isto, quem já passou pela
+  // escolha de modo uma vez (como o PC do Felype) nunca veria o aviso, porque o modal de modo não abre de novo.
+  function mostrarAvisoExemplo(){
+    if (!ehExemploIntocado()) return;
+    try{ if (localStorage.getItem("obraFotosAvisoExemploMostrado")) return; localStorage.setItem("obraFotosAvisoExemploMostrado", "1"); }catch(e){}
+    avisar("Antes de cadastrar", "\"Meu primeiro empreendimento\" é só um exemplo vazio — ele fica aí sem problema, não atrapalha nada. Se os dados deste imóvel já existem em outro celular ou computador, toque em \"Importar backup\" (no rodapé): eles entram do lado deste exemplo, sem apagar nada. Se é a primeira vez que este imóvel entra no app, toque em \"+ Empreendimento\" e cadastre com o nome real.");
+  }
   renderTudo();
   if (!modo) document.getElementById("modalModo").classList.add("aberto");
+  else mostrarAvisoExemplo();
   (async function retomarCompactacoes(){
     const pendentes = []; for (const p of todasParedes()) for (const f of p.fotos) if (f.compactando) pendentes.push(f);
     let n = 0, limpos = 0;

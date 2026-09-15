@@ -22,7 +22,7 @@ blocos.forEach((b, i) => { try { new Function(b); } catch (e) { falha('bloco <sc
 // 2) capacidades que este app precisa ter (nome → o que a ausência significaria para o Felype)
 const CAPACIDADES = {
   'comprimirVideoRapido': 'vídeo não compacta (WebCodecs)', 'CODIGO_WORKER_VIDEO': 'worker de vídeo', 'function comprimirVideo(': 'rota antiga de vídeo',
-  'agendarCompactacao': 'fila de compactação', 'retomarCompactacoes': 'retomada ao abrir', 'tentativas': 'limite de tentativas do vídeo', 'guardarCopiaNoCelular': 'cópia no celular (Download) do que a câmera do app tira', 'ehExemploIntocado': 'exemplo de fábrica sem nome de projeto real',
+  'agendarCompactacao': 'fila de compactação', 'retomarCompactacoes': 'retomada ao abrir', 'tentativas': 'limite de tentativas do vídeo', 'guardarCopiaNoCelular': 'cópia no celular (Download) do que a câmera do app tira', 'ehExemploIntocado': 'exemplo de fábrica sem nome de projeto real', 'mostrarAvisoExemplo': 'aviso do exemplo alcança quem já tinha modo salvo', 'btnEditarEmp': 'renomear/excluir empreendimento',
   'fundirEstados': 'junção de backups/abas', 'function casar(': 'junção por nome', 'marcarRemovido': 'lápides', 'podarLapides': 'poda por lápide',
   'absorverChaveAntiga': 'absorção da versão antiga', 'LS_CARIMBO': 'carimbo entre abas', 'reverterParaDisco': 'desfazer sem espaço',
   'varrerOrfaos': 'faxina de órfãos', 'avisarEspaco': 'aviso de armazenamento', 'idbTodasChaves': 'listagem do IndexedDB',
