@@ -117,7 +117,7 @@
 
 <div class="sel-topo">
   <div>
-    <label>Empreendimento</label>
+    <label>Empreendimento <span id="empContagem" style="font-weight:400;color:var(--sub);"></span></label>
     <select id="empSelect"></select>
   </div>
   <button class="btn-mini" id="btnNovoEmp" type="button">+ Empreendimento</button>
@@ -328,7 +328,7 @@
 
   // ---------- Etapas da obra (validadas pelo Felype em 10/09) ----------
   // carimbo de versão: gravado pelo publicar.sh a partir do relógio (nunca à mão). "dev" = cópia local.
-  const BUILD_TAG='14/09 13h14'; const BUILD_TS=1789402469725;
+  const BUILD_TAG='15/09 11h37'; const BUILD_TS=1789483038909;
   let homonimosCasados = 0; // declarado aqui em cima: a junção roda já na carga (absorção da chave antiga)
   let irmaosJuntados = { unidades: 0, outros: 0 }; // idem: a desduplicação roda na carga
   const ETAPAS_BASE = ["Terreno / Preparação","Fundação","Estrutura","Alvenaria / Vedação","Cobertura","Instalações","Revestimento / Reboco","Esquadrias","Acabamento","Entrega / Habite-se","Pós-obra"];
@@ -896,13 +896,21 @@
   // gravava por cima do que a nova tinha feito e apagava fotos; agora o que ela escreve só é ABSORVIDO.
   const LS_KEY = "obraFotosEstado_v4", LS_KEY_ANTIGA = "obraFotosEstado_v3", LS_REV = "obraFotosRevisao", LS_CARIMBO = "obraFotosCarimbo";
   let carimboJaUnido = ""; // último carimbo de outra aba que já entrou na nossa árvore
+  const ID_EXEMPLO = "emp_exemplo_inicial";
   function estadoPadrao(){
+    // Exemplo de primeira abertura: nome e id NUNCA podem coincidir com um empreendimento real. Um aparelho novo
+    // que abre sem nenhum dado cria isto sozinho — o exemplo antigo chamava-se "Residencial Serena Essence", nome
+    // real de um projeto da Yatil, e o Felype confundiu essa casca vazia com os dados de verdade que só existiam
+    // em outro aparelho (15/09/2026: "no PC só aparece o Serena e sem as alterações que eu fiz" — nunca era o
+    // Serena real, era este exemplo).
     return { empreendimentos: [
-      { id: "emp_serena_essence_default", nome: "Residencial Serena Essence", tipo:"casa",
-        unidades: [ { id: "un_serena_unidade1_default", nome: "Unidade 1", andares: moldeUnidade("casa", "un_serena_unidade1_default") } ],
-        areasComuns: null, equipamentos: { andares: moldeEquipamentos("emp_serena_essence_default") } }
+      { id: ID_EXEMPLO, nome: "Meu primeiro empreendimento", tipo:"casa",
+        unidades: [ { id: "un_exemplo_inicial_unidade1", nome: "Unidade 1", andares: moldeUnidade("casa", "un_exemplo_inicial_unidade1") } ],
+        areasComuns: null, equipamentos: { andares: moldeEquipamentos(ID_EXEMPLO) } }
     ]};
   }
+  // é o exemplo de fábrica intocado: 1 único empreendimento, o id do exemplo, e nenhuma foto ainda
+  function ehExemploIntocado(){ return estado.empreendimentos.length === 1 && estado.empreendimentos[0].id === ID_EXEMPLO && contarFotos(estado) === 0; }
   function sanearEstado(st){
     st.empreendimentos = (st.empreendimentos||[]).filter(e => e && e.id).map(e => {
       e.unidades = Array.isArray(e.unidades) ? e.unidades : [];
@@ -1157,6 +1165,7 @@
     localStorage.setItem("obraFotosModo", modo);
     document.getElementById("modalModo").classList.remove("aberto");
     renderModo(); renderProgresso(); renderAmbientes();
+    if (ehExemploIntocado()) avisar("Antes de cadastrar", "\"Meu primeiro empreendimento\" é só um exemplo vazio — ele fica aí sem problema, não atrapalha nada. Se os dados deste imóvel já existem em outro celular ou computador, toque em \"Importar backup\" (no rodapé): eles entram do lado deste exemplo, sem apagar nada. Se é a primeira vez que este imóvel entra no app, toque em \"+ Empreendimento\" e cadastre com o nome real.");
   }));
   document.getElementById("etapaSelect").addEventListener("change", (e)=>{
     const an = getAndarAtual();
@@ -1177,6 +1186,8 @@
       empSel.appendChild(o);
     }
     empSel.value = empAtualId;
+    const nEmp = estado.empreendimentos.length;
+    document.getElementById("empContagem").textContent = "(" + nEmp + (nEmp === 1 ? " cadastrado)" : " cadastrados)");
 
     const emp = getEmp(empAtualId);
     const unidSel = document.getElementById("unidSelect");
