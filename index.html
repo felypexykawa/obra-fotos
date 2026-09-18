@@ -225,13 +225,18 @@
     </div>
     <div id="predioExtras" style="display:none;">
       <div class="duas-col">
-        <div><label>Subsolos (garagem)</label><input type="text" inputmode="numeric" id="predioSubsolos" placeholder="Ex: 2"></div>
-        <div><label>Pavimentos acima do térreo</label><input type="text" inputmode="numeric" id="predioPavimentos" placeholder="Ex: 9"></div>
+        <div><label>Subsolos</label><input type="text" inputmode="numeric" id="predioSubsolos" placeholder="Ex: 2"></div>
+        <div><label>Garagem em quais subsolos?</label><input type="text" id="predioSubsolosGaragem" placeholder="Ex: 1,2 · em branco = nenhum"></div>
       </div>
-      <div class="check-row"><input type="checkbox" id="predioCobertura"><label for="predioCobertura" style="margin:0;">Tem cobertura / terraço</label></div>
+      <div class="duas-col">
+        <div><label>Pavimentos, contando o térreo</label><input type="text" inputmode="numeric" id="predioPavimentos" placeholder="Ex: 10 = térreo + 9 andares"></div>
+        <div><label>Garagem em quais pavimentos?</label><input type="text" id="predioPavimentosGaragem" placeholder="Ex: 1,2 · 1=térreo · em branco = nenhum"></div>
+      </div>
+      <p class="nota-modal">A cobertura (o telhado) entra sozinha — toda obra tem uma. Terraço é outra coisa: só marque abaixo se a cobertura tiver terraço de verdade.</p>
+      <div class="check-row"><input type="checkbox" id="predioTerraco"><label for="predioTerraco" style="margin:0;">A cobertura tem terraço</label></div>
       <label>Unidades por andar (padrão — dá pra ajustar andar a andar depois)</label>
       <input type="text" inputmode="numeric" id="predioUnidadesPorAndar" placeholder="Ex: 4 → 101, 102, 103, 104 em cada andar">
-      <p class="nota-modal">Isso só monta os níveis do prédio. Piscina, salão de festas, academia, garagem no térreo etc. você adiciona no andar onde ficam de verdade — cada andar tem "+ Adicionar ambiente" com sugestões.</p>
+      <p class="nota-modal">Isso só monta os níveis do prédio. Piscina, salão de festas, academia etc. você adiciona no andar onde ficam de verdade — cada andar tem "+ Adicionar ambiente" com sugestões. Andar marcado como garagem não ganha unidade (101, 102...) automática.</p>
     </div>
     <div class="modal-acoes">
       <button class="cancelar" id="empCancelar" type="button">Cancelar</button>
@@ -329,7 +334,7 @@
 
   // ---------- Etapas da obra (validadas pelo Felype em 10/09) ----------
   // carimbo de versão: gravado pelo publicar.sh a partir do relógio (nunca à mão). "dev" = cópia local.
-  const BUILD_TAG='15/09 12h20'; const BUILD_TS=1789485605439;
+  const BUILD_TAG='18/09 10h27'; const BUILD_TS=1789738034122;
   let homonimosCasados = 0; // declarado aqui em cima: a junção roda já na carga (absorção da chave antiga)
   let irmaosJuntados = { unidades: 0, outros: 0 }; // idem: a desduplicação roda na carga
   const ETAPAS_BASE = ["Terreno / Preparação","Fundação","Estrutura","Alvenaria / Vedação","Cobertura","Instalações","Revestimento / Reboco","Esquadrias","Acabamento","Entrega / Habite-se","Pós-obra"];
@@ -438,19 +443,35 @@
   }
   // Prédio: só monta os NÍVEIS (subsolo, térreo, andares, cobertura). O que existe em cada nível
   // (garagem, piscina, salão...) o usuário adiciona no andar certo — não é pré-colocado no térreo.
-  function moldeAreasComuns(numSubsolos, numPavimentos, temCobertura, base){
+  // "1,3" -> Set{1,3}; aceita espaço, vírgula ou ponto-e-vírgula como separador; ignora lixo
+  function parseListaNumeros(txt){
+    const out = new Set();
+    for (const parte of String(txt||"").split(/[,;\s]+/)) { const nn = parseInt(parte, 10); if (Number.isFinite(nn) && nn > 0) out.add(nn); }
+    return out;
+  }
+  // subsolo 1 = o mais raso (perto do térreo); pavimento 1 = o TÉRREO (é assim que se fala na obra: "esse prédio
+  // tem 10 pavimentos" já conta o térreo — pedir "pavimentos ACIMA do térreo" obriga a pessoa a fazer conta de
+  // cabeça). Garagem é marcada andar a andar (não presumida por nível: nem todo subsolo é garagem, nem só o
+  // subsolo pode ser). Cobertura NUNCA é opcional — toda obra tem telhado; terraço é um detalhe DELA, não outro
+  // nível. Achado com o Felype na obra (18/09/2026): "vish, isso reflete um entendimento errado".
+  function moldeAreasComuns(numSubsolos, garagemSubsolos, numPavimentos, garagemPavimentos, temTerraco, base){
     const b = base ? slug(base) + "_comuns" : null;
+    garagemSubsolos = garagemSubsolos || new Set(); garagemPavimentos = garagemPavimentos || new Set();
     const andares = [];
     for (let i=(numSubsolos||0); i>=1; i--){
-      andares.push(novoAndar(numSubsolos===1 ? "Subsolo" : ("Subsolo "+i), [{nome:"Garagem"}], b));
+      const nome = numSubsolos===1 ? "Subsolo" : ("Subsolo "+i);
+      andares.push(novoAndar(nome, garagemSubsolos.has(i) ? [{nome:"Garagem"}] : [], b));
     }
-    andares.push(novoAndar("Térreo", [{nome:"Hall de Entrada"}], b));
-    for (let i=1;i<=(numPavimentos||0);i++){
-      andares.push(novoAndar(i+"° Andar", [{nome:"Corredor"},{nome:"Hall"}], b));
+    const totalPav = Math.max(numPavimentos||0, 1); // sempre existe ao menos o térreo
+    for (let i=1; i<=totalPav; i++){
+      const ehGaragem = garagemPavimentos.has(i);
+      if (i === 1) andares.push(novoAndar("Térreo", ehGaragem ? [{nome:"Garagem"}] : [{nome:"Hall de Entrada"}], b));
+      else andares.push(novoAndar((i-1)+"° Andar", ehGaragem ? [{nome:"Garagem"}] : [{nome:"Corredor"},{nome:"Hall"}], b));
     }
-    if (temCobertura) andares.push(novoAndar("Cobertura", [], b));
+    andares.push(novoAndar("Cobertura", temTerraco ? [{nome:"Terraço"}] : [], b));
     return andares;
   }
+  function ehAndarGaragem(andar){ return andar.ambientes.length === 1 && andar.ambientes[0].nome === "Garagem"; }
   function moldeEquipamentos(base){
     const b = base ? slug(base) + "_equip" : null;
     const andar = novoAndar("Equipamentos", [ {nome:"Portão"}, {nome:"Interfone"} ], b);
@@ -929,7 +950,7 @@
         }
       });
       if (e.areasComuns && !Array.isArray(e.areasComuns.andares)) e.areasComuns.andares = [];
-      if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0,0,false, e.id) };
+      if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0, new Set(), 1, new Set(), false, e.id) }; // fallback mínimo (só Térreo + Cobertura): prédio chegou sem areasComuns (import/dado antigo), sem informação de subsolo/garagem pra recuperar
       if (e.equipamentos && !Array.isArray(e.equipamentos.andares)) e.equipamentos.andares = [];
       if (!e.equipamentos && (e.tipo==="casa"||e.tipo==="predio")) e.equipamentos = { andares: moldeEquipamentos(e.id) };
       return e;
@@ -1004,7 +1025,16 @@
       return true;
     }catch(e){
       console.error(e);
-      avisar("Sem espaço no aparelho", "Não consegui gravar as alterações — o armazenamento do celular está cheio. Apague fotos/vídeos antigos ou exporte um backup e limpe. A última ação NÃO foi salva.");
+      const ehQuota = !!(e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014 || /quota/i.test(String(e.name||""))));
+      if (ehQuota){
+        // o limite do navegador é contado em CARACTERES do texto salvo (medido: 5.242.880 chars de verdade em
+        // Chrome, igual pra texto com ou sem acento) — não em bytes; mb() aqui recebe esse número de caracteres
+        let tam = "?"; try{ tam = mb(JSON.stringify(estado).length); }catch(e2){}
+        let resgate = ""; try{ const r = localStorage.getItem(LS_KEY + "_resgate"); if (r) resgate = " Também tem uma cópia de resgate antiga aqui (" + mb(r.length) + ") de um problema já resolvido — me avise que eu confirmo e apago pra abrir espaço."; }catch(e3){}
+        avisar("Sem espaço PARA OS REGISTROS (não é o celular)", "Não consegui gravar — a lista de empreendimentos e fotos deste app (" + tam + ") bateu no limite que o navegador reserva só pra isso, separado do espaço geral do celular. É por isso que o celular pode estar com espaço de sobra e isto acontecer mesmo assim. A última ação NÃO foi salva. Exportar um backup NÃO libera espaço aqui — só apagar registro antigo (foto, vídeo, unidade ou andar) libera. O que mais pesa aqui não é foto — é a estrutura (andar/ambiente/ponto): um cadastro só, se for grande demais (muitas unidades por andar), pode encher isto sozinho." + resgate);
+      } else {
+        avisar("Não consegui salvar", "Algo deu errado ao gravar — não parece ser falta de espaço. A última ação NÃO foi salva. Se isso se repetir, me mostra esta tela: " + String((e && e.name) || e).slice(0, 100));
+      }
       return false;
     }
   }
@@ -1017,13 +1047,22 @@
     try{
       const raw = localStorage.getItem(LS_KEY_ANTIGA); if (!raw) return 0;
       const assinatura = raw.length + ":" + raw.slice(-160);
-      if (localStorage.getItem("obraFotosV3Absorvido") === assinatura) return 0;
+      // essa cópia antiga inteira (chave v3) nunca era limpa — ficava ocupando o cofre pequeno pra sempre, mesmo
+      // depois de absorvida (achado confere-no-disco, 18/09). É seguro apagar assim que a assinatura bater: o
+      // conteúdo dela já está garantido dentro da árvore atual, e varrerOrfaos() passa a proteger os blobs só
+      // pela árvore — que já os cobre. Se uma aba antiga (v3) escrever de novo aqui no futuro, a assinatura muda
+      // e a absorção roda normalmente de novo.
+      if (localStorage.getItem("obraFotosV3Absorvido") === assinatura){
+        try{ localStorage.removeItem(LS_KEY_ANTIGA); }catch(e0){}
+        return 0;
+      }
       const velho = sanearEstado(JSON.parse(raw));
       const antes = contarFotos(estado);
       const r = fundirEstados(estado, velho); if (r.irmaos.unidades) avisarIrmaos(r.irmaos.unidades);
       localStorage.setItem("obraFotosV3Absorvido", assinatura);
       const ganho = contarFotos(estado) - antes;
       if (ganho > 0) salvarEstado();
+      try{ localStorage.removeItem(LS_KEY_ANTIGA); }catch(e1){}
       return ganho;
     }catch(e){ console.warn("absorção da chave antiga falhou", e); return 0; }
   }
@@ -1381,8 +1420,10 @@
     tipoSelecionado = null;
     document.getElementById("empNomeInput").value = "";
     document.getElementById("predioSubsolos").value = "";
+    document.getElementById("predioSubsolosGaragem").value = "";
     document.getElementById("predioPavimentos").value = "";
-    document.getElementById("predioCobertura").checked = false;
+    document.getElementById("predioPavimentosGaragem").value = "";
+    document.getElementById("predioTerraco").checked = false;
     document.getElementById("predioUnidadesPorAndar").value = "";
     document.querySelectorAll(".tipo-btn[data-tipo]").forEach(b=>b.classList.remove("sel"));
     document.getElementById("predioExtras").style.display = "none";
@@ -1397,7 +1438,7 @@
     document.getElementById("predioExtras").style.display = tipoSelecionado==="predio" ? "block" : "none";
   });
   document.getElementById("empCancelar").onclick = () => document.getElementById("modalEmp").classList.remove("aberto");
-  document.getElementById("empConfirmar").addEventListener("click", ()=>{
+  document.getElementById("empConfirmar").addEventListener("click", async ()=>{
     const nome = document.getElementById("empNomeInput").value.trim();
     if (nome && !nomeLivre(estado.empreendimentos, nome)){ toast('Já existe um empreendimento chamado "' + nome + '" — use outro nome'); return; }
     if (!nome || !tipoSelecionado){ toast("Preenche o nome e escolhe o tipo"); return; }
@@ -1407,13 +1448,22 @@
       areasComuns: null, equipamentos: null };
     if (tipoSelecionado==="predio"){
       const numSubsolos = parseInt(document.getElementById("predioSubsolos").value, 10) || 0;
+      const garagemSubsolos = parseListaNumeros(document.getElementById("predioSubsolosGaragem").value);
       const numPavimentos = parseInt(document.getElementById("predioPavimentos").value, 10) || 0;
-      const temCobertura = document.getElementById("predioCobertura").checked;
-      novoEmp.areasComuns = { andares: moldeAreasComuns(numSubsolos, numPavimentos, temCobertura, novoEmp.id) };
+      const garagemPavimentos = parseListaNumeros(document.getElementById("predioPavimentosGaragem").value);
+      const temTerraco = document.getElementById("predioTerraco").checked;
+      novoEmp.areasComuns = { andares: moldeAreasComuns(numSubsolos, garagemSubsolos, numPavimentos, garagemPavimentos, temTerraco, novoEmp.id) };
       const porAndar = parseInt(document.getElementById("predioUnidadesPorAndar").value, 10) || 0;
       if (porAndar > 0){
+        // acima disso, um cadastro SOZINHO pode não caber no cofre pequeno do navegador (medido: ~1.500 unidades
+        // enchem o limite de verdade) — avisa e confirma ANTES de montar tudo, em vez de deixar tentar e falhar
+        const estimativa = novoEmp.areasComuns.andares.filter(an => ehAndarNumerado(an) && !ehAndarGaragem(an)).length * porAndar;
+        if (estimativa > 800){
+          const ok = await pedirConfirmacao("Prédio muito grande", "Esse tanto de unidades (~" + estimativa + ") é grande o bastante pra não caber no espaço que o navegador reserva pra estes registros. Considere cadastrar por etapa (menos unidades por andar agora, ajustando andar a andar depois em \"🏢 gerar unidades por andar\"). Criar mesmo assim?", "Criar mesmo assim");
+          if (!ok) return;
+        }
         const mapa = {};
-        for (const an of novoEmp.areasComuns.andares) if (ehAndarNumerado(an)) mapa[an.id] = porAndar;
+        for (const an of novoEmp.areasComuns.andares) if (ehAndarNumerado(an) && !ehAndarGaragem(an)) mapa[an.id] = porAndar;
         novoEmp.unidades = [];
         gerarUnidadesPorAndar(novoEmp, mapa);
         if (!novoEmp.unidades.length) novoEmp.unidades.push({ id: unidId, nome: "Unidade 1", andares: moldeUnidade("predio", unidId) });
@@ -1422,9 +1472,17 @@
     if (tipoSelecionado==="casa" || tipoSelecionado==="predio"){
       novoEmp.equipamentos = { andares: moldeEquipamentos(novoEmp.id) };
     }
+    const empAtualIdAntes = empAtualId, unidAtualIdAntes = unidAtualId, andarAtualIdAntes = andarAtualId, abertosAntes = abertos;
     estado.empreendimentos.push(novoEmp);
     empAtualId = novoEmp.id; unidAtualId = novoEmp.unidades.length ? novoEmp.unidades[0].id : "__areas_comuns__"; andarAtualId = null; abertos = {};
-    salvarEstado();
+    if (!salvarEstado()){
+      // não coube: desfaz o cadastro da memória — senão ele fica "fantasma" e toda ação seguinte (até numa unidade
+      // diferente) falha com o mesmo aviso de espaço até a página recarregar (achado confere-no-disco, 18/09)
+      estado.empreendimentos = estado.empreendimentos.filter(e => e.id !== novoEmp.id);
+      empAtualId = empAtualIdAntes; unidAtualId = unidAtualIdAntes; andarAtualId = andarAtualIdAntes; abertos = abertosAntes;
+      renderTudo();
+      return;
+    }
     document.getElementById("modalEmp").classList.remove("aberto");
     renderTudo();
     toast("Empreendimento criado");
