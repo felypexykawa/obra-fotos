@@ -100,6 +100,11 @@
   .duas-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .btn-perigo{margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1px solid #d9b3ae;background:#fff;color:var(--accent-dark);font-size:13px;}
   .nota-modal{font-size:12px;color:var(--sub);margin:8px 0 0;line-height:1.4;}
+  #genMsg{white-space:pre-line;}
+  .tipo-btn.largo{grid-column:1 / -1;}
+  .resumo-predio{font-size:12px;margin:10px 0 0;padding:8px 10px;border-radius:8px;background:#f3f1ec;color:#444;line-height:1.5;}
+  .resumo-predio.erro{background:#fdece9;color:var(--accent-dark);}
+  .resumo-predio:empty{display:none;}
 </style>
 </head>
 <body>
@@ -125,12 +130,12 @@
     <label>Unidade / Setor</label>
     <select id="unidSelect"></select>
   </div>
-  <button class="btn-mini" id="btnNovaUnid" type="button">+ Unidade</button>
+  <button class="btn-mini" id="btnNovaUnid" type="button" title="Adiciona uma casa/apartamento/setor a este empreendimento (em casas geminadas o app pergunta a posição na fileira)">+ Unidade</button>
 </div>
 <div class="ambiente-acoes" style="padding:6px 14px 0;">
-  <span id="btnEditarEmp">✎ editar empreendimento</span>
-  <span id="btnEditarUnid">✎ editar unidade</span>
-  <span id="btnUnidadesPorAndar" style="display:none;">🏢 gerar unidades por andar</span>
+  <span id="btnEditarEmp" title="Renomear ou excluir o empreendimento. Em casas: também marcar como casas geminadas (e dar a posição de cada casa na fileira).">✎ editar empreendimento</span>
+  <span id="btnEditarUnid" title="Renomear ou excluir a unidade. Em casas geminadas: mudar a posição dela na fileira (meio, ponta esquerda, ponta direita).">✎ editar unidade</span>
+  <span id="btnUnidadesPorAndar" style="display:none;" title="Prédio: diz quantos apartamentos tem em cada andar e o app cria os números (101, 102, 201…)">🏢 gerar unidades por andar</span>
 </div>
 
 <div class="tabs" id="tabs"></div>
@@ -218,24 +223,27 @@
     <input type="text" id="empNomeInput" placeholder="Ex: Residencial X">
     <label>Tipo</label>
     <div class="tipo-grid" id="tipoGrid">
-      <button class="tipo-btn" data-tipo="terreno" type="button">Terreno</button>
-      <button class="tipo-btn" data-tipo="casa" type="button">Casa</button>
-      <button class="tipo-btn" data-tipo="apto" type="button">Apto</button>
-      <button class="tipo-btn" data-tipo="predio" type="button">Prédio</button>
+      <button class="tipo-btn" data-tipo="terreno" type="button" title="Lote sem construção: registra frente, laterais e fundos">Terreno</button>
+      <button class="tipo-btn" data-tipo="casa" type="button" title="Casa isolada: os 4 lados (frente, fundos e as duas laterais) ficam livres pra fotografar">Casa</button>
+      <button class="tipo-btn" data-tipo="apto" type="button" title="Um apartamento avulso">Apto</button>
+      <button class="tipo-btn" data-tipo="predio" type="button" title="Prédio com andares, apartamentos e áreas comuns">Prédio</button>
+      <button class="tipo-btn largo" data-tipo="geminado" type="button" title="Casas coladas umas nas outras pela lateral, numa fileira. As do meio só têm frente e fundos; as das pontas têm também o lado livre.">Casas geminadas<small>coladas na lateral — o app ajusta os lados de fora de cada casa</small></button>
     </div>
     <div id="predioExtras" style="display:none;">
       <div class="duas-col">
-        <div><label>Subsolos</label><input type="text" inputmode="numeric" id="predioSubsolos" placeholder="Ex: 2"></div>
-        <div><label>Garagem em quais subsolos?</label><input type="text" id="predioSubsolosGaragem" placeholder="Ex: 1,2 · em branco = nenhum"></div>
+        <div><label>Subsolos</label><input type="text" inputmode="numeric" id="predioSubsolos" placeholder="Ex: 2" title="Quantos subsolos o prédio tem (só o número). Em branco = nenhum."></div>
+        <div><label>Garagem em quais subsolos?</label><input type="text" id="predioSubsolosGaragem" placeholder="Ex: 1,2 ou todos · vazio = nenhum" title="Os NÚMEROS dos subsolos que são garagem (1 = o mais perto do térreo), ou a palavra todos. Não é a quantidade."></div>
       </div>
       <div class="duas-col">
-        <div><label>Pavimentos, contando o térreo</label><input type="text" inputmode="numeric" id="predioPavimentos" placeholder="Ex: 10 = térreo + 9 andares"></div>
-        <div><label>Garagem em quais pavimentos?</label><input type="text" id="predioPavimentosGaragem" placeholder="Ex: 1,2 · 1=térreo · em branco = nenhum"></div>
+        <div><label>Pavimentos, contando o térreo</label><input type="text" inputmode="numeric" id="predioPavimentos" placeholder="Ex: 10 = térreo + 9 andares" title="Quantos pavimentos o prédio tem no total, JÁ contando o térreo (10 = térreo + 9 andares)."></div>
+        <div><label>Garagem em quais pavimentos?</label><input type="text" id="predioPavimentosGaragem" placeholder="Ex: 1,2 ou todos · 1=térreo · vazio = nenhum" title="Os NÚMEROS dos pavimentos que são garagem (1 = térreo), ou a palavra todos. Não é a quantidade."></div>
       </div>
       <p class="nota-modal">A cobertura (o telhado) entra sozinha — toda obra tem uma. Terraço é outra coisa: só marque abaixo se a cobertura tiver terraço de verdade.</p>
       <div class="check-row"><input type="checkbox" id="predioTerraco"><label for="predioTerraco" style="margin:0;">A cobertura tem terraço</label></div>
-      <label>Unidades por andar (padrão — dá pra ajustar andar a andar depois)</label>
-      <input type="text" inputmode="numeric" id="predioUnidadesPorAndar" placeholder="Ex: 4 → 101, 102, 103, 104 em cada andar">
+      <label for="predioUnidadesPorAndar">Quantos apartamentos por andar?</label>
+      <input type="text" inputmode="numeric" id="predioUnidadesPorAndar" placeholder="Ex: 2" title="Digite só a QUANTIDADE por andar (ex.: 2). Os números dos apartamentos o app cria sozinho: 101, 102, 201, 202…">
+      <p class="nota-modal">Só a QUANTIDADE (ex.: 2), não os números dos apartamentos: o app cria 101, 102, 201, 202… sozinho, andar por andar. Dá pra ajustar andar a andar depois.</p>
+      <div id="predioResumo" class="resumo-predio" aria-live="polite"></div>
       <p class="nota-modal">Isso só monta os níveis do prédio. Piscina, salão de festas, academia etc. você adiciona no andar onde ficam de verdade — cada andar tem "+ Adicionar ambiente" com sugestões. Andar marcado como garagem não ganha unidade (101, 102...) automática.</p>
     </div>
     <div class="modal-acoes">
@@ -328,13 +336,13 @@
   "use strict";
 
   const MESES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-  const AREAS_COMUNS_SUGESTOES = ["Hall","Corredor","Garagem","Salão de Festas","Salão de Jogos","Academia","Piscina","Playground","Cinema","Escada","Elevador"];
+  const AREAS_COMUNS_SUGESTOES = ["Hall","Corredor","Garagem","Salão de Festas","Salão de Jogos","Academia","Piscina","Piscina adulto","Piscina infantil","WC masculino","WC feminino","WC externo masculino","WC externo feminino","Lavanderia","Playground","Cinema","Escada","Elevador"]; // andar de lazer (Felype, 21/09): salão de festas, jogos, academia, piscina(s), WC masc./fem. e externos, lavanderia
   const UNIDADE_SUGESTOES = ["Telhado","Caixa d'água","Laje de cobertura","Calhas e rufos","Muro de divisa","Cisterna / poço","Fossa / caixa de gordura","Quadro elétrico","Padrão de entrada (Celesc)","Área de serviço","Churrasqueira","Piscina","Sacada","Garagem"];
   const EQUIPAMENTOS_SUGESTOES = ["Placas Solares","Gerador","Bomba de Cisterna","Bomba de Drenagem","Elevador","Bomba de Piscina","Bomba de Cascata","Câmeras"];
 
   // ---------- Etapas da obra (validadas pelo Felype em 10/09) ----------
   // carimbo de versão: gravado pelo publicar.sh a partir do relógio (nunca à mão). "dev" = cópia local.
-  const BUILD_TAG='18/09 10h27'; const BUILD_TS=1789738034122;
+  const BUILD_TAG='21/09 12h59'; const BUILD_TS=1790006345294;
   let homonimosCasados = 0; // declarado aqui em cima: a junção roda já na carga (absorção da chave antiga)
   let irmaosJuntados = { unidades: 0, outros: 0 }; // idem: a desduplicação roda na carga
   const ETAPAS_BASE = ["Terreno / Preparação","Fundação","Estrutura","Alvenaria / Vedação","Cobertura","Instalações","Revestimento / Reboco","Esquadrias","Acabamento","Entrega / Habite-se","Pós-obra"];
@@ -417,7 +425,7 @@
 
   const ROOMS_CASA_PADRAO = [
     {nome:"Jardim (fundos)",paredes:4}, {nome:"Calçada Fundos",paredes:4}, {nome:"Lavanderia",paredes:4}, {nome:"Escada",paredes:4},
-    {nome:"Área Social",paredes:4}, {nome:"Lavabo",paredes:4}, {nome:"Calçada Frente",paredes:4}, {nome:"Fachada",paredes:4}, {nome:"Garagem",paredes:4}
+    {nome:"Área Social",paredes:4}, {nome:"Lavabo",paredes:4}, {nome:"Calçada Frente",paredes:4}, {nome:"Garagem",paredes:4} // sem "Fachada": desde a v7.6 a aba Fachadas cuida dos lados de fora (casa antiga mantém a dela)
   ];
   // Cobertura da casa: telhado, caixa d'água, laje — Felype (14/09): "quero tirar foto do telhado onde fizemos
   // regularização, depois impermeabilização, depois na caixa d'água" e só tinha os ambientes internos.
@@ -431,13 +439,100 @@
     {nome:"Suíte 2",paredes:4}, {nome:"BWC 2",paredes:4}, {nome:"Varanda",paredes:4}
   ];
 
-  function moldeUnidade(tipo, base){
+  // ---------- Fachadas: os lados de FORA da construção ----------
+  // Felype (21/09/2026), antes de ir ao Residencial Serena (5 casas geminadas): "casa vai ter sempre os lados, assim
+  // como galpão" — e a casa GEMINADA não tem o lado que encosta na vizinha: as do meio só têm frente e fundos, as das
+  // pontas têm também um lado livre. Cada casa ganha um nível "Fachadas" com UM ambiente por lado que ela tem.
+  // Ids de fábrica derivados do id da unidade: dois celulares que montam a mesma casa geram os mesmos ids e a
+  // junção não duplica. Terreno já nascia com os 4 lados; prédio ganha o nível nas áreas comuns.
+  const LADOS_TODOS = ["Frente","Lateral Esquerda","Lateral Direita","Fundos"];
+  const POSICOES = [
+    { v:"meio",           curto:"meio",       longo:"meio (só frente e fundos)",     rotulo:"Meio da fileira — só frente e fundos" },
+    { v:"ponta-esquerda", curto:"ponta esq.", longo:"ponta (lado livre à esquerda)", rotulo:"Ponta — lado ESQUERDO livre (olhando da rua)" },
+    { v:"ponta-direita",  curto:"ponta dir.", longo:"ponta (lado livre à direita)",  rotulo:"Ponta — lado DIREITO livre (olhando da rua)" },
+    { v:"isolada",        curto:"isolada",    longo:"isolada (os 4 lados livres)",   rotulo:"Isolada — os 4 lados livres" }
+  ];
+  // quais lados a casa TEM. Casa comum: todos. Geminada: depende da posição; sem posição definida, todos (na dúvida
+  // sobra um lado vazio que se apaga — faltar seria perder o lugar de registrar)
+  function ladosExpostos(emp, u){
+    if (!emp || !emp.geminado) return LADOS_TODOS.slice();
+    const p = u && u.posicao;
+    if (p === "meio") return ["Frente","Fundos"];
+    if (p === "ponta-esquerda") return ["Frente","Lateral Esquerda","Fundos"];
+    if (p === "ponta-direita") return ["Frente","Lateral Direita","Fundos"];
+    return LADOS_TODOS.slice();
+  }
+  function rotuloPosicao(emp, u){
+    if (!emp || !emp.geminado) return "";
+    const p = POSICOES.find(x => x.v === u.posicao);
+    return p ? " · " + p.curto : " · definir posição";
+  }
+  function novoNivelFachadas(base, lados){
+    const nivel = novoAndar("Fachadas", (lados || LADOS_TODOS).map(n => ({nome:n})), base);
+    for (const am of nivel.ambientes) am.auto = true; // ambiente que o APP mantém: a junção pode tirar o vazio que a posição da casa não tem. O que a pessoa cria não leva a marca
+    return nivel;
+  }
+  function ehAndarFachadas(andar){ return nomeNorm(andar && andar.nome) === "fachadas"; }
+  // Deixa o nível "Fachadas" da casa com os lados que ela tem. opts.remover: tira o lado que NÃO existe — só se estiver
+  // SEM foto (lado com foto nunca é apagado, só devolvido em "mantidos"). opts.forcar: recoloca lado/nível mesmo com
+  // lápide (a pessoa mandou; o novo nasce com id aleatório, para a lápide velha não matá-lo na junção). Sem opts (carga
+  // do app): só ACRESCENTA o que falta e respeita lápide. opts.auto (depois de uma JUNÇÃO entre aparelhos): só mexe nas LATERAIS
+  // e só tira o que o app mesmo pôs (marca `auto` ou id de fábrica) — ambiente que a pessoa criou nunca é tocado, e frente/fundos
+  // nunca são recolocados sozinhos (a pessoa pode ter apagado de propósito).
+  function reconciliarFachadas(st, emp, u, opts){
+    opts = opts || {};
+    const res = { adicionados:[], removidos:[], mantidos:[] };
+    const lados = ladosExpostos(emp, u);
+    const base = slug(u.id);
+    const tomb = lapides(st);
+    const fab = novoNivelFachadas(base, LADOS_TODOS); // só para conhecer os ids de fábrica
+    let nivel = u.andares.find(a => a.id === fab.id) || u.andares.find(a => ehAndarFachadas(a));
+    if (!nivel){
+      if (opts.auto) return res;
+      if (tomb.has(fab.id) && !opts.forcar) return res;
+      nivel = novoNivelFachadas(tomb.has(fab.id) ? null : base, lados);
+      u.andares.push(nivel);
+      res.adicionados = lados.slice();
+      return res;
+    }
+    for (const nome of LADOS_TODOS){
+      const idFab = "am_" + base + "_fachadas_" + slug(nome);
+      const amb = nivel.ambientes.find(a => a.id === idFab) || nivel.ambientes.find(a => nomeNorm(a.nome) === nomeNorm(nome));
+      const deve = lados.includes(nome);
+      if (deve && !amb){
+        if (opts.auto && nome !== "Lateral Esquerda" && nome !== "Lateral Direita") continue;
+        if (tomb.has(idFab) && !opts.forcar) continue;
+        const novo = novoAmbiente(nome, "", 1, tomb.has(idFab) ? null : base + "_fachadas");
+        novo.auto = true;
+        nivel.ambientes.push(novo);
+        res.adicionados.push(nome);
+      } else if (!deve && amb && opts.remover){
+        if (opts.auto && !(amb.auto || amb.id === idFab)) continue; // depois da junção só sai o que o APP pôs
+        if (registroDeAmb(amb)){ res.mantidos.push(nome); continue; } // foto OU anotação escrita: nunca apaga o que a pessoa registrou
+        nivel.ambientes = nivel.ambientes.filter(a => a !== amb);
+        marcarRemovidoEm(st, amb.id);
+        if (amb.id !== idFab) marcarRemovidoEm(st, idFab);
+        res.removidos.push(nome);
+      }
+    }
+    if (opts.remover && !opts.auto){
+      // a "Fachada" ANTIGA (ambiente de 4 paredes dentro do Térreo, de antes da v7.6) passou a ser coberta pelo nível Fachadas:
+      // numa casa que virou geminada ela contradiz a aba nova (4 paredes numa casa do meio). Sai só se estiver VAZIA (sem foto e
+      // sem anotação) e só pelo id de fábrica — ambiente que a pessoa criou com esse nome fica.
+      const terreo = u.andares.find(a => a.id === "an_" + base + "_terreo") || u.andares.find(a => nomeNorm(a.nome) === "terreo");
+      const velha = terreo && terreo.ambientes.find(a => a.id === "am_" + base + "_terreo_fachada");
+      if (velha && !registroDeAmb(velha)){ terreo.ambientes = terreo.ambientes.filter(a => a !== velha); marcarRemovidoEm(st, velha.id); res.removidos.push("Fachada antiga do Térreo"); }
+    }
+    return res;
+  }
+
+  function moldeUnidade(tipo, base, lados){
     const b = base ? slug(base) : null;
     if (tipo==="terreno"){
       return [ novoAndar("Terreno", [ {nome:"Frente"}, {nome:"Lateral Esquerda"}, {nome:"Lateral Direita"}, {nome:"Fundos"} ], b) ];
     }
     if (tipo==="casa"){
-      return [ novoAndar("Térreo", ROOMS_CASA_PADRAO, b), novoAndar("2° Pavimento", ROOMS_CASA_2PAV, b), novoAndar("Cobertura", ROOMS_CASA_COBERTURA, b) ];
+      return [ novoAndar("Térreo", ROOMS_CASA_PADRAO, b), novoAndar("2° Pavimento", ROOMS_CASA_2PAV, b), novoAndar("Cobertura", ROOMS_CASA_COBERTURA, b), novoNivelFachadas(b, lados || LADOS_TODOS) ];
     }
     return [ novoAndar("Único", ROOMS_APTO, b) ];
   }
@@ -469,9 +564,77 @@
       else andares.push(novoAndar((i-1)+"° Andar", ehGaragem ? [{nome:"Garagem"}] : [{nome:"Corredor"},{nome:"Hall"}], b));
     }
     andares.push(novoAndar("Cobertura", temTerraco ? [{nome:"Terraço"}] : [], b));
+    andares.push(novoNivelFachadas(b, LADOS_TODOS)); // os 4 lados de fora do prédio (lado colado no vizinho: apague o ambiente)
     return andares;
   }
   function ehAndarGaragem(andar){ return andar.ambientes.length === 1 && andar.ambientes[0].nome === "Garagem"; }
+  // Campo de QUANTIDADE que não aceita o que não é quantidade. Nasceu do incidente de 18-21/09/2026: o Felype digitou
+  // "301 e 302" (os números dos apartamentos) num campo que pedia QUANTOS por andar; o app leu 301 e tentou criar
+  // 3.010 unidades (~10,6 MB contra um limite de 5 MB). Um número só: vale se couber no máximo. Vários números
+  // grandes (lista de apartamentos, só onde aceitaLista): conta quantos são. Qualquer outra coisa: recusa explicando.
+  function lerQuantidade(txt, rotulo, max, aceitaLista){
+    const t = String(txt == null ? "" : txt).trim();
+    if (!t) return { ok:true, n:0, vazio:true };
+    const nums = (t.match(/\d+/g) || []).map(s => parseInt(s, 10));
+    if (!nums.length) return { ok:false, msg: rotulo + ': digite só um número (ex.: 2). Recebi "' + t + '".' };
+    if (nums.length === 1){
+      if (nums[0] > max) return { ok:false, msg: rotulo + ': ' + nums[0] + ' é demais — o máximo aqui é ' + max + '. Digite só QUANTAS são (ex.: 2), não os números delas.' };
+      return { ok:true, n:nums[0] };
+    }
+    if (aceitaLista && nums.length <= max && nums.every(x => x >= 10))
+      return { ok:true, n:nums.length, dica:'Entendi "' + t + '" como ' + nums.length + ' por andar — o app cria os números sozinho (101, 102, 201…).' };
+    return { ok:false, multiplos:true, msg: rotulo + ': digite um número só (ex.: 2). Recebi "' + t + '".' };
+  }
+  // tudo o que o formulário de prédio vai criar, calculado ANTES de criar (serve ao resumo ao vivo e à conferência final)
+  function planoPredio(){
+    const val = id => document.getElementById(id).value;
+    const sub = lerQuantidade(val("predioSubsolos"), "Subsolos", 10);
+    const pav = lerQuantidade(val("predioPavimentos"), "Pavimentos", 80);
+    const por = lerQuantidade(val("predioUnidadesPorAndar"), "Apartamentos por andar", 40, true);
+    const plano = { subsolos: sub.n || 0, pavimentos: pav.n || 0, porAndar: por.n || 0, erro: null, dica: por.dica || null, total: 0, andaresNumerados: 0 };
+    const ruim = [sub, pav, por].find(x => !x.ok);
+    if (ruim){
+      // andares com quantidades diferentes (Felype, 21/09: "no segundo andar tenho X unidades e nos demais Y"): o campo é o PADRÃO; o andar diferente se ajusta depois
+      plano.erro = ruim.msg + (ruim === por && ruim.multiplos ? ' Se os andares têm quantidades diferentes, digite a mais comum aqui e ajuste os outros depois em "gerar unidades por andar".' : '');
+      return plano;
+    }
+    const lerGaragem = (txt, total, quem) => {
+      const t = String(txt || "").trim();
+      if (/^(todos|todas|tudo)$/i.test(t)){ const s = new Set(); for (let i = 1; i <= total; i++) s.add(i); return { set:s }; }
+      const s = parseListaNumeros(t);
+      const fora = [...s].filter(i => i > total);
+      if (fora.length) return { erro: 'Garagem: você marcou o ' + quem + ' ' + fora[0] + ', mas o prédio só tem ' + total + '. Digite os NÚMEROS onde tem garagem (ex.: 1,2 ou todos).' };
+      return { set:s };
+    };
+    const gs = lerGaragem(val("predioSubsolosGaragem"), plano.subsolos, "subsolo");
+    const gp = lerGaragem(val("predioPavimentosGaragem"), Math.max(plano.pavimentos, 1), "pavimento");
+    if (gs.erro || gp.erro){ plano.erro = gs.erro || gp.erro; return plano; }
+    plano.garagemSubsolos = gs.set; plano.garagemPavimentos = gp.set;
+    const andares = moldeAreasComuns(plano.subsolos, gs.set, plano.pavimentos, gp.set, false, null);
+    const numerados = andares.filter(an => ehAndarNumerado(an) && !ehAndarGaragem(an));
+    plano.andaresNumerados = numerados.length;
+    plano.total = numerados.length * plano.porAndar;
+    plano.garagens = andares.filter(ehAndarGaragem).map(an => an.nome);
+    plano.exemplos = [];
+    if (plano.total > 0){
+      const nome = (an, i) => prefixoUnidade(an) + String(i).padStart(2, "0");
+      const primeiro = numerados[0], ultimo = numerados[numerados.length - 1];
+      for (let i = 1; i <= Math.min(2, plano.porAndar); i++) plano.exemplos.push(nome(primeiro, i));
+      if (plano.total > plano.exemplos.length) plano.exemplos.push("…", nome(ultimo, plano.porAndar));
+    }
+    return plano;
+  }
+  function textoResumoPredio(p){
+    const partes = [];
+    if (p.subsolos) partes.push(p.subsolos + (p.subsolos === 1 ? " subsolo" : " subsolos"));
+    partes.push(p.pavimentos <= 1 ? "só o térreo" : p.pavimentos + " pavimentos (térreo + " + (p.pavimentos - 1) + (p.pavimentos - 1 === 1 ? " andar)" : " andares)"));
+    let t = "Vai criar: " + partes.join(" · ") + " · cobertura · fachadas (frente, fundos e laterais).";
+    if (p.garagens.length) t += " Garagem em: " + p.garagens.join(", ") + ".";
+    if (p.total > 0) t += "\nApartamentos: " + p.andaresNumerados + (p.andaresNumerados === 1 ? " andar" : " andares") + " × " + p.porAndar + " = " + p.total + " (" + p.exemplos.join(", ") + ").\nTodos os andares saem com a mesma quantidade — se algum for diferente (ex.: o andar de lazer), ajuste depois em \"gerar unidades por andar\".";
+    else t += "\nSem apartamentos por enquanto — dá pra gerar depois pelo botão \"gerar unidades por andar\".";
+    if (p.dica) t += "\n" + p.dica;
+    return t;
+  }
   function moldeEquipamentos(base){
     const b = base ? slug(base) + "_equip" : null;
     const andar = novoAndar("Equipamentos", [ {nome:"Portão"}, {nome:"Interfone"} ], b);
@@ -948,9 +1111,23 @@
           if (!tem && !lapide) u.andares.push(cob);
           u.coberturaAplicada = true;
         }
+        // casa (comum ou geminada) cadastrada antes de 21/09 ganha o nível Fachadas UMA vez, com os lados que ela tem
+        // (ids de fábrica: dois celulares que fazem isso sozinhos geram o MESMO nível e a junção não duplica)
+        if (e.tipo === "casa" && !u.fachadasAplicadas){
+          reconciliarFachadas(st, e, u, {});
+          u.fachadasAplicadas = true;
+        }
       });
       if (e.areasComuns && !Array.isArray(e.areasComuns.andares)) e.areasComuns.andares = [];
       if (!e.areasComuns && e.tipo==="predio") e.areasComuns = { andares: moldeAreasComuns(0, new Set(), 1, new Set(), false, e.id) }; // fallback mínimo (só Térreo + Cobertura): prédio chegou sem areasComuns (import/dado antigo), sem informação de subsolo/garagem pra recuperar
+      if (e.tipo === "predio" && e.areasComuns && !e.areasComuns.fachadasAplicadas){
+        // prédio de antes de 21/09: os 4 lados de fora entram UMA vez nas áreas comuns (id de fábrica; lápide respeitada)
+        const fabP = novoNivelFachadas(slug(e.id) + "_comuns", LADOS_TODOS);
+        const temP = e.areasComuns.andares.some(a => a.id === fabP.id || ehAndarFachadas(a));
+        const lapideP = (st.removidos||[]).some(r => r.id === fabP.id);
+        if (!temP && !lapideP) e.areasComuns.andares.push(fabP);
+        e.areasComuns.fachadasAplicadas = true;
+      }
       if (e.equipamentos && !Array.isArray(e.equipamentos.andares)) e.equipamentos.andares = [];
       if (!e.equipamentos && (e.tipo==="casa"||e.tipo==="predio")) e.equipamentos = { andares: moldeEquipamentos(e.id) };
       return e;
@@ -959,12 +1136,13 @@
   }
   // LÁPIDES: id de foto excluída/refeita fica anotado na árvore; a junção (outra aba, backup, aba antiga)
   // nunca ressuscita um registro com lápide — antes, um backup antigo trazia a foto apagada de volta.
-  function marcarRemovido(id){
-    if (!Array.isArray(estado.removidos)) estado.removidos = [];
-    estado.removidos.push({ id, ts: Date.now() });
+  function marcarRemovidoEm(st, id){
+    if (!Array.isArray(st.removidos)) st.removidos = [];
+    st.removidos.push({ id, ts: Date.now() });
     const limite = Date.now() - 180*24*3600*1000;
-    estado.removidos = estado.removidos.filter(r => r.ts > limite).slice(-2000);
+    st.removidos = st.removidos.filter(r => r.ts > limite).slice(-2000);
   }
+  function marcarRemovido(id){ marcarRemovidoEm(estado, id); }
   function lapides(...sts){ const t = new Set(); for (const st of sts) for (const r of (st && st.removidos) || []) t.add(r.id); return t; }
   function contarFotos(st){ let n = 0; for (const e of st.empreendimentos||[]){ const conts = [].concat(e.unidades||[], e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]); for (const c of conts) for (const an of c.andares||[]) for (const amb of an.ambientes||[]) for (const p of amb.paredes||[]) n += (p.fotos||[]).length; } return n; }
   function carregarEstado(){
@@ -1222,7 +1400,7 @@
     const empSel = document.getElementById("empSelect");
     empSel.innerHTML = "";
     for (const emp of estado.empreendimentos){
-      const o = document.createElement("option"); o.value=emp.id; o.textContent = emp.nome + " (" + emp.tipo + ")";
+      const o = document.createElement("option"); o.value=emp.id; o.textContent = emp.nome + " (" + (emp.geminado ? "casas geminadas" : emp.tipo) + ")";
       empSel.appendChild(o);
     }
     empSel.value = empAtualId;
@@ -1233,7 +1411,7 @@
     const unidSel = document.getElementById("unidSelect");
     unidSel.innerHTML = "";
     for (const u of emp.unidades){
-      const o = document.createElement("option"); o.value=u.id; o.textContent = u.nome;
+      const o = document.createElement("option"); o.value=u.id; o.textContent = u.nome + rotuloPosicao(emp, u);
       unidSel.appendChild(o);
     }
     if (emp.areasComuns){
@@ -1427,8 +1605,18 @@
     document.getElementById("predioUnidadesPorAndar").value = "";
     document.querySelectorAll(".tipo-btn[data-tipo]").forEach(b=>b.classList.remove("sel"));
     document.getElementById("predioExtras").style.display = "none";
+    atualizarResumoPredio();
     document.getElementById("modalEmp").classList.add("aberto");
   });
+  function atualizarResumoPredio(){
+    const el = document.getElementById("predioResumo"); if (!el) return;
+    if (tipoSelecionado !== "predio"){ el.textContent = ""; el.classList.remove("erro"); return; }
+    const p = planoPredio();
+    el.classList.toggle("erro", !!p.erro);
+    el.textContent = p.erro ? p.erro : textoResumoPredio(p);
+  }
+  document.getElementById("predioExtras").addEventListener("input", atualizarResumoPredio);
+  document.getElementById("predioExtras").addEventListener("change", atualizarResumoPredio);
   document.getElementById("tipoGrid").addEventListener("click", (e)=>{
     const b = e.target.closest(".tipo-btn");
     if (!b) return;
@@ -1436,24 +1624,38 @@
     b.classList.add("sel");
     tipoSelecionado = b.getAttribute("data-tipo");
     document.getElementById("predioExtras").style.display = tipoSelecionado==="predio" ? "block" : "none";
+    atualizarResumoPredio();
   });
   document.getElementById("empCancelar").onclick = () => document.getElementById("modalEmp").classList.remove("aberto");
   document.getElementById("empConfirmar").addEventListener("click", async ()=>{
     const nome = document.getElementById("empNomeInput").value.trim();
     if (nome && !nomeLivre(estado.empreendimentos, nome)){ toast('Já existe um empreendimento chamado "' + nome + '" — use outro nome'); return; }
     if (!nome || !tipoSelecionado){ toast("Preenche o nome e escolhe o tipo"); return; }
+    const ehGem = tipoSelecionado === "geminado";
+    const tipoReal = ehGem ? "casa" : tipoSelecionado; // geminado é casa com posição na fileira, não um tipo à parte: o resto do app trata como casa
+    let plano = null;
+    if (tipoReal === "predio"){
+      // confere ANTES de criar qualquer coisa: "301 e 302" num campo de quantidade já custou um cadastro de 3.010 unidades
+      plano = planoPredio();
+      if (plano.erro){ await avisar("Confere os números do prédio", plano.erro); return; }
+      // quando o app REINTERPRETOU o que foi digitado ("301 e 302" → 2 por andar), mostra o que entendeu ANTES de criar: o resumo ao vivo
+      // pode ficar fora da tela no celular (revisão de 21/09), esta confirmação não
+      if (plano.dica){ const okDica = await pedirConfirmacao("Confere o que eu entendi", textoResumoPredio(plano), "Criar assim"); if (!okDica) return; }
+    }
+    let posicao1 = null;
+    if (ehGem){ posicao1 = await perguntarPosicao('Onde fica a "Unidade 1" na fileira?', "meio"); if (!posicao1) return; }
     const unidId = gerarId("un");
-    const novoEmp = { id: gerarId("emp"), nome, tipo: tipoSelecionado,
-      unidades: [ { id: unidId, nome: (tipoSelecionado==="terreno" ? "Terreno" : "Unidade 1"), andares: moldeUnidade(tipoSelecionado, unidId) } ],
+    const novoEmp = { id: gerarId("emp"), nome, tipo: tipoReal,
+      unidades: [ { id: unidId, nome: (tipoReal==="terreno" ? "Terreno" : "Unidade 1"), andares: [] } ],
       areasComuns: null, equipamentos: null };
-    if (tipoSelecionado==="predio"){
-      const numSubsolos = parseInt(document.getElementById("predioSubsolos").value, 10) || 0;
-      const garagemSubsolos = parseListaNumeros(document.getElementById("predioSubsolosGaragem").value);
-      const numPavimentos = parseInt(document.getElementById("predioPavimentos").value, 10) || 0;
-      const garagemPavimentos = parseListaNumeros(document.getElementById("predioPavimentosGaragem").value);
+    if (ehGem){ const agoraG = Date.now(); novoEmp.geminado = true; novoEmp.geminadoTs = agoraG; novoEmp.unidades[0].posicao = posicao1; novoEmp.unidades[0].posicaoTs = agoraG; }
+    novoEmp.unidades[0].andares = moldeUnidade(tipoReal, unidId, ladosExpostos(novoEmp, novoEmp.unidades[0]));
+    if (tipoReal==="predio"){
+      const numSubsolos = plano.subsolos, garagemSubsolos = plano.garagemSubsolos;
+      const numPavimentos = plano.pavimentos, garagemPavimentos = plano.garagemPavimentos;
       const temTerraco = document.getElementById("predioTerraco").checked;
       novoEmp.areasComuns = { andares: moldeAreasComuns(numSubsolos, garagemSubsolos, numPavimentos, garagemPavimentos, temTerraco, novoEmp.id) };
-      const porAndar = parseInt(document.getElementById("predioUnidadesPorAndar").value, 10) || 0;
+      const porAndar = plano.porAndar;
       if (porAndar > 0){
         // acima disso, um cadastro SOZINHO pode não caber no cofre pequeno do navegador (medido: ~1.500 unidades
         // enchem o limite de verdade) — avisa e confirma ANTES de montar tudo, em vez de deixar tentar e falhar
@@ -1469,7 +1671,7 @@
         if (!novoEmp.unidades.length) novoEmp.unidades.push({ id: unidId, nome: "Unidade 1", andares: moldeUnidade("predio", unidId) });
       }
     }
-    if (tipoSelecionado==="casa" || tipoSelecionado==="predio"){
+    if (tipoReal==="casa" || tipoReal==="predio"){
       novoEmp.equipamentos = { andares: moldeEquipamentos(novoEmp.id) };
     }
     const empAtualIdAntes = empAtualId, unidAtualIdAntes = unidAtualId, andarAtualIdAntes = andarAtualId, abertosAntes = abertos;
@@ -1493,11 +1695,18 @@
     const nome = await pedirTexto("Nova unidade", "Unidade " + (emp.unidades.length+1));
     if (!nome) return;
     if (!nomeLivre(emp.unidades, nome)){ await avisar("Nome repetido", 'Já existe uma unidade chamada "' + nome + '" neste empreendimento. Use outro nome: duas iguais confundem você e a junção entre celulares.'); return; }
+    let posicaoNova = null;
+    if (emp.geminado){ posicaoNova = await perguntarPosicao('Onde fica "' + nome + '" na fileira?', "meio"); if (!posicaoNova) return; }
+    const empAgora = getEmp(emp.id); // o modal pode ter ficado aberto enquanto outra aba mexeu
+    if (!empAgora){ toast("Esse empreendimento já não existe"); renderTudo(); return; }
     const idNova = gerarId("un");
-    const novaUnid = { id: idNova, nome: nome, andares: moldeUnidade(emp.tipo, idNova) };
-    emp.unidades.push(novaUnid);
+    const novaUnid = { id: idNova, nome: nome, andares: [] };
+    if (posicaoNova){ novaUnid.posicao = posicaoNova; novaUnid.posicaoTs = Date.now(); }
+    novaUnid.andares = moldeUnidade(empAgora.tipo, idNova, ladosExpostos(empAgora, novaUnid));
+    empAgora.unidades.push(novaUnid);
+    const unidAntes = unidAtualId;
     unidAtualId = novaUnid.id; andarAtualId = null; abertos = {};
-    salvarEstado();
+    if (!salvarEstado()){ empAgora.unidades = empAgora.unidades.filter(u => u !== novaUnid); unidAtualId = unidAntes; renderTudo(); return; }
     renderTudo();
     toast("Unidade adicionada");
   });
@@ -1545,6 +1754,7 @@
     const lista = document.getElementById("unidadesPorAndarLista");
     lista.innerHTML = "";
     for (const andar of emp.areasComuns.andares){
+      if (ehAndarFachadas(andar)) continue; // lados de fora do prédio não têm apartamento
       const atual = emp.unidades.filter(u=>u.andarRef===andar.id).length;
       lista.insertAdjacentHTML("beforeend",
         `<div class="duas-col" style="align-items:center;margin-top:6px;">
@@ -1555,23 +1765,124 @@
     document.getElementById("modalUnidades").classList.add("aberto");
   });
   document.getElementById("unidadesCancelar").onclick = () => document.getElementById("modalUnidades").classList.remove("aberto");
-  document.getElementById("unidadesConfirmar").addEventListener("click", ()=>{
-    const emp = getEmp(empAtualId);
-    const mapa = {};
+  document.getElementById("unidadesConfirmar").addEventListener("click", async ()=>{
+    const emp0 = getEmp(empAtualId);
+    if (!emp0 || !emp0.areasComuns) return;
+    const mapa = {}, menores = []; let erro = null, novas = 0;
     document.querySelectorAll("#unidadesPorAndarLista [data-unid-andar]").forEach(inp => {
-      mapa[inp.getAttribute("data-unid-andar")] = parseInt(inp.value, 10) || 0;
+      if (erro) return;
+      const idAndar = inp.getAttribute("data-unid-andar");
+      const andar = emp0.areasComuns.andares.find(a => a.id === idAndar);
+      const r = lerQuantidade(inp.value, andar ? andar.nome : "Andar", 40, true);
+      if (!r.ok){ erro = r.msg; return; }
+      mapa[idAndar] = r.n;
+      const existentes = emp0.unidades.filter(u => u.andarRef === idAndar).length;
+      novas += Math.max(0, r.n - existentes);
+      // andar com MENOS que o que já existe: o app só cria, nunca apaga sozinho — sem avisar, parecia que "não funcionou"
+      if (!r.vazio && r.n < existentes) menores.push((andar ? andar.nome : "Andar") + ": você pediu " + r.n + ", já tem " + existentes);
     });
+    if (erro){ await avisar("Confere os números", erro); return; }
+    if (novas > 0 && emp0.unidades.length + novas > 800){
+      const ok = await pedirConfirmacao("Muitas unidades", "Isso deixa o prédio com ~" + (emp0.unidades.length + novas) + " unidades — perto do que cabe no espaço que o navegador reserva pra estes registros. Criar mesmo assim?", "Criar mesmo assim");
+      if (!ok) return;
+    }
+    const emp = getEmp(emp0.id);
+    if (!emp || !emp.areasComuns){ toast("Esse empreendimento já não existe"); renderTudo(); return; }
+    const antes = emp.unidades.slice();
     const criadas = gerarUnidadesPorAndar(emp, mapa);
-    salvarEstado();
+    if (!salvarEstado()){ emp.unidades = antes; renderTudo(); return; } // não coube: desfaz na memória (senão as ações seguintes falham com o mesmo aviso)
     document.getElementById("modalUnidades").classList.remove("aberto");
     renderTudo();
     toast(criadas ? (criadas + " unidade(s) criada(s)") : "Nada novo pra criar — já existiam");
+    if (menores.length) await avisar("Não apaguei nenhuma unidade", "Aqui o app só CRIA unidades — nunca apaga sozinho. Nestes andares você pediu menos do que já existe:\n" + menores.join("\n") + '\n\nPra tirar as que sobram: escolha a unidade e toque em "✎ editar unidade" → Excluir (só dá pra excluir unidade sem fotos).');
   });
 
+  // ---------- Casas geminadas: marcar o empreendimento e dar a posição de cada casa ----------
+  // aplica uma mudança na árvore e grava; se não couber, DESFAZ na memória (senão fica "fantasma" e toda ação seguinte falha)
+  function comReversao(mudar){
+    const antes = JSON.stringify([estado.empreendimentos, estado.removidos || []]);
+    mudar();
+    if (salvarEstado()) return true;
+    const b = JSON.parse(antes); estado.empreendimentos = b[0]; estado.removidos = b[1];
+    renderTudo();
+    return false;
+  }
+  // fileiras de N casas seguidas, na ordem da lista: a primeira de cada fileira é ponta esquerda, a última ponta direita,
+  // as do meio "meio"; fileira de uma casa só = isolada
+  function posicoesPorFileira(qtdCasas, porFileira, invertido){
+    const ini = invertido ? "ponta-direita" : "ponta-esquerda", fim = invertido ? "ponta-esquerda" : "ponta-direita"; // invertido: a primeira da lista fica na ponta DIREITA (olhando da rua)
+    const out = [];
+    for (let i = 0; i < qtdCasas; i += porFileira){
+      const n = Math.min(porFileira, qtdCasas - i);
+      for (let k = 0; k < n; k++) out.push(n === 1 ? "isolada" : (k === 0 ? ini : (k === n - 1 ? fim : "meio")));
+    }
+    return out;
+  }
+  async function perguntarPosicao(titulo, atual){
+    const ini = (POSICOES.find(p => p.v === atual) || POSICOES[0]).rotulo;
+    const r = await modalGenerico({ titulo, msg: "Olhando a casa da rua. Casa do meio da fileira não tem lateral pra fotografar: só frente e fundos.", opcoes: POSICOES.map(p => p.rotulo), valorInicial: ini, textoOk: "Confirmar" });
+    if (r === null) return null;
+    const p = POSICOES.find(x => x.rotulo === r);
+    return p ? p.v : null;
+  }
+  async function configurarGeminadas(empId){
+    const emp0 = getEmp(empId);
+    if (!emp0 || emp0.tipo !== "casa") return;
+    const ids0 = emp0.unidades.map(u => u.id);
+    const nCasas = ids0.length;
+    if (!nCasas){ await avisar("Sem casas", "Cadastre as casas primeiro (+ Unidade) e depois volte aqui."); return; }
+    const titulo = 'Casas geminadas — "' + emp0.nome + '"';
+    if (emp0.geminado){
+      const o = await pedirOpcao(titulo, ["Refazer as posições das casas", "Desmarcar (todas viram casa isolada)"], "Refazer as posições das casas");
+      if (o === null) return;
+      if (o.indexOf("Desmarcar") === 0){
+        const ok0 = await pedirConfirmacao("Desmarcar geminado", 'Todas as casas de "' + emp0.nome + '" passam a ter os 4 lados livres (frente, fundos e as duas laterais). Não apaga nada.', "Desmarcar");
+        if (!ok0) return;
+        const emp1 = getEmp(empId); if (!emp1){ toast("Esse empreendimento já não existe"); renderTudo(); return; }
+        if (!comReversao(() => { emp1.geminado = false; emp1.geminadoTs = Date.now(); for (const u of emp1.unidades) reconciliarFachadas(estado, emp1, u, { forcar:true }); })) return;
+        renderTudo(); toast("Voltou a ser casas comuns (4 lados)"); return;
+      }
+    }
+    const rec = await modalGenerico({ titulo, comInput:true, valorInicial:String(nCasas), textoOk:"Continuar",
+      msg: "Casa geminada encosta na vizinha pela lateral: esse lado não dá pra fotografar. As do meio só têm frente e fundos; as das pontas têm também o lado livre.\n\nQuantas casas tem em CADA fileira colada? (5 casas coladas numa fileira só = 5. Duas fileiras de 3 = 3.)" });
+    if (rec === null) return;
+    const q = lerQuantidade(rec, "Casas por fileira", nCasas);
+    if (!q.ok || q.n < 1){ await avisar("Confere o número", q.ok ? "Digite quantas casas tem em cada fileira colada: de 1 até " + nCasas + "." : q.msg); return; }
+    // de que lado fica a primeira casa da lista? (só existe pra fileira de 2+ casas) — errar isso põe o nome "esquerda/direita" na lateral errada
+    let invertido = false;
+    if (q.n >= 2){
+      const lado = await modalGenerico({ titulo: "Onde fica a primeira casa da lista?", msg: 'Olhando as casas da rua: "' + emp0.unidades[0].nome + '" (a primeira da lista) fica na ponta da ESQUERDA ou da DIREITA? Serve pra dar o nome certo à lateral livre de cada ponta.', opcoes: ["Na ponta da ESQUERDA", "Na ponta da DIREITA"], valorInicial: "Na ponta da ESQUERDA", textoOk: "Continuar" });
+      if (lado === null) return;
+      invertido = lado.indexOf("DIREITA") >= 0;
+    }
+    const pos = posicoesPorFileira(nCasas, q.n, invertido);
+    const linhas = emp0.unidades.map((u, i) => u.nome + " — " + POSICOES.find(p => p.v === pos[i]).longo).join("\n");
+    const ok = await pedirConfirmacao("Confere a divisão", linhas + '\n\nA ordem é a da lista de unidades, olhando da rua (a primeira de cada fileira fica na ponta ' + (invertido ? 'da DIREITA' : 'da ESQUERDA') + '). Se alguma estiver trocada, depois toque em "✎ editar unidade" → "Posição na fileira".\n\nA "Fachada" antiga do Térreo, se estiver vazia, sai: a aba "Fachadas" passa a cuidar disso. Lado ou ambiente com foto ou anotação nunca é apagado.', "Aplicar");
+    if (!ok) return;
+    const emp = getEmp(empId);
+    if (!emp){ toast("Esse empreendimento já não existe"); renderTudo(); return; }
+    if (emp.unidades.map(u => u.id).join("|") !== ids0.join("|")){ await avisar("A lista mudou", 'As unidades mudaram enquanto você escolhia (outra aba?). Abra "Casas geminadas" de novo.'); return; }
+    const mantidos = [];
+    if (!comReversao(() => {
+      const agoraC = Date.now();
+      emp.geminado = true; emp.geminadoTs = agoraC;
+      emp.unidades.forEach((u, i) => {
+        u.posicao = pos[i]; u.posicaoTs = agoraC;
+        const r = reconciliarFachadas(estado, emp, u, { remover:true, forcar:true });
+        for (const n of r.mantidos) mantidos.push(u.nome + " — " + n);
+      });
+    })) return;
+    renderTudo();
+    const pontas = pos.filter(p => p.indexOf("ponta") === 0).length, meios = pos.filter(p => p === "meio").length, isol = pos.filter(p => p === "isolada").length;
+    let msg = '"' + emp.nome + '" agora é geminado: ' + pontas + ' casa(s) de ponta, ' + meios + ' do meio' + (isol ? ' e ' + isol + ' isolada(s)' : '') + '. Cada casa tem a aba "Fachadas" só com os lados que existem.';
+    if (mantidos.length) msg += "\n\nATENÇÃO: estes lados já tinham foto ou anotação e por isso NÃO foram apagados:\n" + mantidos.join("\n");
+    await avisar("Casas geminadas", msg);
+  }
   document.getElementById("btnEditarEmp").addEventListener("click", async ()=>{
     const emp0 = getEmp(empAtualId);
-    const escolha = await pedirOpcao('Empreendimento "'+emp0.nome+'"', ["Renomear","Excluir"], "Renomear");
+    const escolha = await pedirOpcao('Empreendimento "'+emp0.nome+'"', emp0.tipo === "casa" ? ["Renomear","Casas geminadas","Excluir"] : ["Renomear","Excluir"], "Renomear");
     if (escolha===null) return;
+    if (escolha==="Casas geminadas"){ await configurarGeminadas(emp0.id); return; }
     if (escolha==="Renomear"){
       const nome = await pedirTexto("Nome do empreendimento", emp0.nome);
       if (!nome) return;
@@ -1600,8 +1911,20 @@
     const emp = getEmp(empAtualId);
     const unid = emp.unidades.find(u=>u.id===unidAtualId);
     if (!unid){ await avisar("Setor especial", "Áreas Comuns e Equipamentos não são unidades — pra mexer neles, edite os andares e ambientes direto."); return; }
-    const escolha = await pedirOpcao('Unidade "'+unid.nome+'"', ["Renomear","Excluir"], "Renomear");
+    const escolha = await pedirOpcao('Unidade "'+unid.nome+'"', emp.geminado ? ["Renomear","Posição na fileira","Excluir"] : ["Renomear","Excluir"], "Renomear");
     if (escolha===null) return;
+    if (escolha==="Posição na fileira"){
+      const nova = await perguntarPosicao('Onde fica "' + unid.nome + '" na fileira?', unid.posicao);
+      if (!nova) return;
+      const empP = getEmp(emp.id), uP = empP && empP.unidades.find(u => u.id === unid.id);
+      if (!uP){ toast("Essa unidade já não existe"); renderTudo(); return; }
+      let r = null;
+      if (!comReversao(() => { uP.posicao = nova; uP.posicaoTs = Date.now(); r = reconciliarFachadas(estado, empP, uP, { remover:true, forcar:true }); })) return;
+      renderTudo();
+      if (r.mantidos.length) await avisar("Posição atualizada", "Estes lados já tinham foto ou anotação e por isso NÃO foram apagados: " + r.mantidos.join(", ") + ".");
+      else toast("Posição atualizada");
+      return;
+    }
     if (escolha==="Renomear"){
       const nome = await pedirTexto("Nome da unidade", unid.nome);
       if (!nome) return;
@@ -2195,6 +2518,13 @@
   function fotosDeAmb(a){ return ((a && a.paredes)||[]).some(fotosDeParede); }
   function fotosDeAndar(an){ return ((an && an.ambientes)||[]).some(fotosDeAmb); }
   function fotosDeUnid(u){ return ((u && u.andares)||[]).some(fotosDeAndar); }
+  // "tem REGISTRO" = foto OU anotação escrita no ambiente. A lápide vinda de outro celular (ex.: o lado de fachada que uma
+  // casa do meio não tem) não pode apagar em silêncio o que a pessoa ESCREVEU num ambiente sem foto — mesma regra da foto:
+  // o registro vence a exclusão (achado do revisor, 21/09: anotação sumia na junção). A tela de excluir continua olhando só
+  // foto: apagar de propósito, neste aparelho, é decisão da pessoa.
+  function registroDeAmb(a){ return fotosDeAmb(a) || !!String((a && a.observacao) || "").trim(); }
+  function registroDeAndar(an){ return ((an && an.ambientes)||[]).some(registroDeAmb); }
+  function registroDeUnid(u){ return ((u && u.andares)||[]).some(registroDeAndar); }
   function casar(destino, origem){
     const usados = new Set();
     return (origem||[]).map(o => {
@@ -2244,13 +2574,13 @@
   function fundirAndares(destino, origem, tomb, opts){
     tomb = tomb || new Set(); opts = opts || {};
     for (const [anOrigem, anDestino] of casar(destino, origem)){
-      if (tomb.has(anOrigem.id) && !fotosDeAndar(anOrigem)) continue;
+      if (tomb.has(anOrigem.id) && !registroDeAndar(anOrigem)) continue;
       if (!anDestino){ destino.push(anOrigem); continue; }
       if (opts.campos && anDestino.id === anOrigem.id && anOrigem.nome) anDestino.nome = anOrigem.nome;
       // etapa: a mudança mais RECENTE vence (dois celulares podem ter mexido no mesmo andar)
       if (anOrigem.etapaAtual && (!anDestino.etapaAtual || (anOrigem.etapaTs||0) > (anDestino.etapaTs||0))){ anDestino.etapaAtual = anOrigem.etapaAtual; anDestino.etapaTs = anOrigem.etapaTs||0; }
       for (const [ambOrigem, ambDestino] of casar(anDestino.ambientes, anOrigem.ambientes)){
-        if (tomb.has(ambOrigem.id) && !fotosDeAmb(ambOrigem)) continue;
+        if (tomb.has(ambOrigem.id) && !registroDeAmb(ambOrigem)) continue;
         if (!ambDestino){ anDestino.ambientes.push(ambOrigem); continue; }
         if (opts.campos && ambDestino.id === ambOrigem.id){ if (ambOrigem.nome) ambDestino.nome = ambOrigem.nome; if (ambOrigem.observacao !== undefined) ambDestino.observacao = ambOrigem.observacao; }
         for (const [pOrigem, pDestino] of casar(ambDestino.paredes, ambOrigem.paredes)){
@@ -2275,12 +2605,12 @@
     for (const e of st.empreendimentos){
       const conts = [].concat(e.unidades||[], e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]);
       for (const c of conts) for (const an of c.andares||[]) for (const amb of an.ambientes||[]) for (const pd of amb.paredes||[]) pd.fotos = (pd.fotos||[]).filter(f => !tomb.has(f.id));
-      e.unidades = (e.unidades||[]).filter(u => fica(u, fotosDeUnid));
+      e.unidades = (e.unidades||[]).filter(u => fica(u, registroDeUnid));
       const conts2 = [].concat(e.unidades, e.areasComuns?[e.areasComuns]:[], e.equipamentos?[e.equipamentos]:[]);
       for (const c of conts2){
-        c.andares = (c.andares||[]).filter(a => fica(a, fotosDeAndar));
+        c.andares = (c.andares||[]).filter(a => fica(a, registroDeAndar));
         for (const an of c.andares){
-          an.ambientes = (an.ambientes||[]).filter(a => fica(a, fotosDeAmb));
+          an.ambientes = (an.ambientes||[]).filter(a => fica(a, registroDeAmb));
           for (const amb of an.ambientes) amb.paredes = (amb.paredes||[]).filter(p => fica(p, fotosDeParede));
         }
       }
@@ -2296,14 +2626,19 @@
       // foto vence a exclusão, igual em andar/unidade/ambiente/ponto (fotosDeAndar etc.): sem isto, excluir um
       // empreendimento VAZIO neste aparelho vira lápide permanente (180 dias) que descarta em silêncio um
       // empreendimento do MESMO id vindo de outro aparelho com fotos de verdade — achado antes de publicar (15/09)
-      if (tomb.has(empOrigem.id) && !todosAndaresDoEmp(empOrigem).some(fotosDeAndar)) continue;
+      if (tomb.has(empOrigem.id) && !todosAndaresDoEmp(empOrigem).some(registroDeAndar)) continue;
       if (!empDestino){ destino.empreendimentos.push(empOrigem); continue; }
       if (empDestino.id !== empOrigem.id) juntadosPorNome++;
       else if (opts.campos && empOrigem.nome) empDestino.nome = empOrigem.nome;
+      // geminado/posição: a configuração feita em OUTRO celular chega se aqui está em branco OU se o carimbo dela (geminadoTs/posicaoTs,
+      // gravado quando a pessoa configura) é mais RECENTE — dois celulares que configuraram sozinhos convergem para o último. Sem carimbo
+      // nos dois lados (dado antigo) o nosso valor fica.
+      if (empOrigem.geminado !== undefined && (empDestino.geminado === undefined || (opts.campos && empDestino.id === empOrigem.id) || (empOrigem.geminadoTs || 0) > (empDestino.geminadoTs || 0))){ empDestino.geminado = empOrigem.geminado; empDestino.geminadoTs = empOrigem.geminadoTs || 0; }
       for (const [unidOrigem, unidDestino] of casar(empDestino.unidades, empOrigem.unidades)){
-        if (tomb.has(unidOrigem.id) && !fotosDeUnid(unidOrigem)) continue;
+        if (tomb.has(unidOrigem.id) && !registroDeUnid(unidOrigem)) continue;
         if (!unidDestino){ empDestino.unidades.push(unidOrigem); continue; }
         if (opts.campos && unidDestino.id === unidOrigem.id && unidOrigem.nome) unidDestino.nome = unidOrigem.nome;
+        if (unidOrigem.posicao !== undefined && (unidDestino.posicao === undefined || (opts.campos && unidDestino.id === unidOrigem.id) || (unidOrigem.posicaoTs || 0) > (unidDestino.posicaoTs || 0))){ unidDestino.posicao = unidOrigem.posicao; unidDestino.posicaoTs = unidOrigem.posicaoTs || 0; }
         fundirAndares(unidDestino.andares, unidOrigem.andares, tomb, opts);
       }
       for (const setor of ["areasComuns","equipamentos"]){
@@ -2317,6 +2652,10 @@
     for (const r of (origem.removidos||[])) if (!vistas.has(r.id)){ (destino.removidos = destino.removidos||[]).push(r); vistas.add(r.id); }
     desduplicarNomes(destino, tomb);
     if (tomb.size) podarLapides(destino, tomb);
+    // a POSIÇÃO da casa manda nos lados de fora também depois da junção: a posição pode ter vindo de outro aparelho, e ids de outro
+    // celular não casam com as lápides (achado da revisão de 21/09). Tira a lateral VAZIA que o app pôs e a posição não tem;
+    // recoloca a lateral que ela tem. Só laterais, só o que o app mantém (opts.auto) — o que a pessoa criou ou fotografou fica.
+    for (const e of destino.empreendimentos) if (e.geminado) for (const u of e.unidades || []) if (u.posicao && Array.isArray(u.andares)) reconciliarFachadas(destino, e, u, { remover:true, forcar:true, auto:true });
     return { juntadosPorNome, homonimos: homonimosCasados, irmaos: Object.assign({}, irmaosJuntados) };
   }
 

@@ -109,7 +109,7 @@ fi
 rm -f "$NOAR"
 # 2.5) caminhos do usuario — o app aberto num Chrome de verdade (harness da skill 21.1). Fail-open de ambiente, fail-closed de achado.
 FASE="na bateria de navegador"; PULOU_BATERIA=""
-if [ -z "$PULAR_BATERIA" ] && [ -f "$HARNESS/v7b_sanity.js" ] && [ -f "$HARNESS/v72_tests.js" ] && [ -d "C:/Users/USER/AppData/Roaming/npm/node_modules/playwright" ]; then
+if [ -z "$PULAR_BATERIA" ] && [ -f "$HARNESS/v7b_sanity.js" ] && [ -f "$HARNESS/v72_tests.js" ] && [ -f "$HARNESS/v76_tests.js" ] && [ -d "C:/Users/USER/AppData/Roaming/npm/node_modules/playwright" ]; then
   RAIZ=$(mktemp -d 2>/dev/null || echo "/tmp/obra-raiz-$$"); mkdir -p "$RAIZ/lib"; cp lib/*.js "$RAIZ/lib/"
   sed "s/const BUILD_TAG='[^']*'; const BUILD_TS=[0-9]*;/const BUILD_TAG='teste'; const BUILD_TS=1000;/" index.html > "$RAIZ/index.html"
   git show 15c3404:index.html > "$RAIZ/v5.html" 2>/dev/null || cp index.html "$RAIZ/v5.html"
@@ -125,8 +125,8 @@ if [ -z "$PULAR_BATERIA" ] && [ -f "$HARNESS/v7b_sanity.js" ] && [ -f "$HARNESS/
   BAT_OK=1
   # o status de um pipeline é o do grep: linha FAIL casava e a bateria "passava". Agora: exit do node E nenhum FAIL.
   # 'cmd; RC=$?' NAO sobrevive ao set -e (o script morria no exit do node com o carimbo aplicado e o servidor vivo):
-  # a forma que sobrevive e o 'if !'. As tres baterias, inclusive a corrida de duas abas (8 rodadas).
-  for BAT in "v7b_sanity.js" "v72_tests.js $RAIZW" "v7b_tests.js"; do
+  # a forma que sobrevive e o 'if !'. As quatro baterias (v76 = casas geminadas, fachadas e campo de unidades, desde 21/09/2026), inclusive a corrida de duas abas (8 rodadas).
+  for BAT in "v7b_sanity.js" "v72_tests.js $RAIZW" "v76_tests.js $RAIZW" "v7b_tests.js"; do
     if ! ( cd "$HARNESS" && PORTA=$PORTA node $BAT ) > "$RAIZ/bat.log" 2>&1; then RCB=1; else RCB=0; fi
     grep -E "PASS|FAIL|TUDO|ERRO|Error" "$RAIZ/bat.log" || true
     if [ $RCB -ne 0 ] || grep -q "FAIL" "$RAIZ/bat.log"; then BAT_OK=""; echo "[publicar] bateria $BAT reprovou (exit=$RCB)"; fi
