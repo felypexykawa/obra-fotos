@@ -11,8 +11,8 @@
   }
   *{box-sizing:border-box;}
   body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px;}
-  header{background:var(--accent);color:#fff;padding:14px 16px 10px;}
-  header h1{font-size:17px;margin:0 0 2px;}
+  header{background:var(--accent);color:#fff;padding:14px 16px 10px;position:sticky;top:0;z-index:30;box-shadow:0 2px 6px rgba(0,0,0,.15);}
+  header h1{font-size:18px;margin:0 0 2px;font-weight:700;}
   header p{font-size:12px;margin:0;opacity:.9;}
   .modo-bar{display:flex;gap:6px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line);}
   .modo-btn{flex:1;padding:8px 6px;border-radius:20px;border:1px solid var(--line);background:#f3f1ec;font-size:12px;color:#555;}
@@ -91,7 +91,7 @@
   .quick-btn{padding:6px 10px;border-radius:14px;border:1px solid var(--line);background:#f3f1ec;font-size:12px;}
   .cap-opcao{display:block;width:100%;padding:14px 12px;margin:8px 0;border-radius:10px;border:1px solid var(--line);background:#f6f6f6;font-size:15px;text-align:left;font-family:inherit;}
   .cap-opcao:active{background:#e8e8e8;}
-  .modal-acoes{display:flex;gap:8px;margin-top:16px;}
+  .modal-acoes{display:flex;gap:8px;margin-top:16px;position:sticky;bottom:0;background:#fff;padding:10px 0;box-shadow:0 -6px 8px -6px rgba(0,0,0,.15);}
   .modal-acoes button{flex:1;padding:10px;border-radius:8px;border:none;font-size:14px;font-weight:600;}
   .modal-acoes .cancelar{background:#eee;color:#555;}
   .modal-acoes .confirmar{background:var(--accent);color:#fff;}
@@ -125,7 +125,7 @@
     <label>Empreendimento <span id="empContagem" style="font-weight:400;color:var(--sub);"></span></label>
     <select id="empSelect"></select>
   </div>
-  <button class="btn-mini" id="btnNovoEmp" type="button">+ Empreendimento</button>
+  <button class="btn-mini" id="btnNovoEmp" type="button" title="Cadastra um empreendimento novo (terreno, casa, apto, prédio ou casas geminadas) — abre o formulário, não cria nada ainda">+ Empreendimento</button>
   <div>
     <label>Unidade / Setor</label>
     <select id="unidSelect"></select>
@@ -140,9 +140,9 @@
 
 <div class="tabs" id="tabs"></div>
 <div class="ambiente-acoes" style="padding:8px 14px 0;">
-  <span id="btnNovoAndar">+ Adicionar andar/setor</span>
-  <span id="btnEditarAndar">✎ editar este andar</span>
-  <span id="btnEtapasPorPavimento">🏗 etapas por pavimento</span>
+  <span id="btnNovoAndar" title="Cria um novo andar ou setor dentro desta unidade/área comum — pede o nome antes de criar">+ Adicionar andar/setor</span>
+  <span id="btnEditarAndar" title="Renomear este andar/setor, mudar a posição na lista ou excluir (só se estiver zerado, sem foto)">✎ editar este andar</span>
+  <span id="btnEtapasPorPavimento" title="Define a etapa da obra (fundação, estrutura, acabamento...) de cada andar/setor separadamente — vale pras fotos novas dali">🏗 etapas por pavimento</span>
 </div>
 <div class="quem-row" id="etapaRow" style="display:none;">
   Etapa atual deste andar:
@@ -166,13 +166,13 @@
   <b>Como usar:</b> escolha o modo lá em cima (obra ou manutenção) — toda foto nova fica marcada com a etapa da obra ou como manutenção. Cada ambiente tem pontos de registro (paredes, teto, detalhes), e cada ponto aceita fotos e vídeos sem limite, com data automática e observação. Andares, ambientes e pontos são todos editáveis.
 </div>
 
-<div style="padding:0 10px;"><button class="btn-add-parede" id="btnNovoAmbiente" type="button">+ Adicionar ambiente</button></div>
+<div style="padding:0 10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn-add-parede" id="btnNovoAmbiente" type="button" title="Cria um ambiente novo neste andar (cômodo, área) com sugestões prontas por tipo de setor">+ Adicionar ambiente</button><button class="btn-add-parede" id="btnMoldeLazer" type="button" style="display:none;" title="Adiciona de uma vez os ambientes comuns de um andar de lazer (salão, academia, piscina, WCs, lavanderia, playground, corredor)">🎉 molde: andar de lazer</button></div>
 <div id="listaAmbientes"></div>
 
 <div class="rodape-acoes">
-  <button id="btnExportar" type="button">⬇ Exportar backup</button>
-  <button id="btnImportar" type="button">⬆ Importar backup</button>
-  <button id="btnCopiaCelular" type="button">📥 Cópia no celular</button>
+  <button id="btnExportar" type="button" title="Baixa um arquivo com tudo que está neste aparelho — mande esse arquivo pro outro celular ou pro PC pra juntar os registros">⬇ Exportar backup</button>
+  <button id="btnImportar" type="button" title="Soma um backup a este aparelho (nunca apaga o que já está aqui) — use isso pra juntar o que foi registrado em outro celular">⬆ Importar backup</button>
+  <button id="btnCopiaCelular" type="button" title="Liga/desliga: quando ligado, toda foto/vídeo tirado pelo app também salva uma cópia na galeria normal do celular, por segurança">📥 Cópia no celular</button>
 </div>
 <input type="file" id="inputImportar" accept="application/json" multiple hidden>
 <input type="file" id="inputFoto" accept="image/*,video/*" hidden>
@@ -181,22 +181,22 @@
 <div class="modal-fundo" id="modalCaptura">
   <div class="modal">
     <h3>Registrar</h3>
-    <button type="button" class="cap-opcao" id="capFoto">📷 Tirar foto agora</button>
-    <button type="button" class="cap-opcao" id="capVideo">🎥 Gravar vídeo agora</button>
-    <button type="button" class="cap-opcao" id="capGaleria">🖼️ Escolher da galeria</button>
+    <button type="button" class="cap-opcao" id="capFoto" title="Abre a câmera direto pra tirar a foto agora — não passa pela galeria">📷 Tirar foto agora</button>
+    <button type="button" class="cap-opcao" id="capVideo" title="Abre a câmera direto pra gravar um vídeo agora — não passa pela galeria">🎥 Gravar vídeo agora</button>
+    <button type="button" class="cap-opcao" id="capGaleria" title="Escolhe uma foto ou vídeo que já está salvo no celular, em vez de gravar agora">🖼️ Escolher da galeria</button>
     <p id="capNota" style="font-size:12px;color:#666;margin:6px 2px 0;"></p>
     <div class="modal-acoes"><button type="button" class="cancelar" id="capCancelar">Cancelar</button></div>
   </div>
 </div>
 
 <div class="lightbox" id="lightbox">
-  <button class="lb-fechar" id="lbFechar" type="button">×</button>
+  <button class="lb-fechar" id="lbFechar" type="button" title="Fechar esta foto/vídeo e voltar pra lista" aria-label="Fechar">×</button>
   <div id="lbMidia"></div>
   <div class="lb-info" id="lbInfo"></div>
   <div class="lb-nota" id="lbNota"></div>
   <div class="lb-acoes">
-    <button id="lbBtnNota" type="button">📝 Observação</button>
-    <button id="lbBtnEtapa" type="button">🏷 Etapa</button>
+    <button id="lbBtnNota" type="button" title="Escreve ou edita uma anotação de texto presa a esta foto/vídeo específico">📝 Observação</button>
+    <button id="lbBtnEtapa" type="button" title="Muda a etapa da obra marcada nesta foto/vídeo específico (sem afetar as outras fotos do andar)">🏷 Etapa</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -278,7 +278,7 @@
 <div class="modal-fundo" id="modalUnidades">
   <div class="modal">
     <h3>Unidades por andar</h3>
-    <p class="nota-modal" style="margin:0 0 6px;">Digite quantas unidades tem em cada andar. O app cria os números sozinho (3° andar com 3 → 301, 302, 303; 10° andar com 2 → 1001, 1002). Só cria o que falta — nunca apaga.</p>
+    <p class="nota-modal" style="margin:0 0 6px;">Digite quantas unidades tem em cada andar. O app cria os números sozinho (3° andar com 3 → 301, 302, 303; 10° andar com 2 → 1001, 1002). Número MAIOR: só cria o que falta. Número MENOR: exclui as que sobram — mas só as que estão sem foto (com foto fica protegida) e sempre pede confirmação antes, mostrando o que vai sair.</p>
     <div id="unidadesPorAndarLista"></div>
     <div class="modal-acoes">
       <button class="cancelar" id="unidadesCancelar" type="button">Cancelar</button>
@@ -342,7 +342,7 @@
 
   // ---------- Etapas da obra (validadas pelo Felype em 10/09) ----------
   // carimbo de versão: gravado pelo publicar.sh a partir do relógio (nunca à mão). "dev" = cópia local.
-  const BUILD_TAG='21/09 12h59'; const BUILD_TS=1790006345294;
+  const BUILD_TAG='24/09 12h00'; const BUILD_TS=1790262005655;
   let homonimosCasados = 0; // declarado aqui em cima: a junção roda já na carga (absorção da chave antiga)
   let irmaosJuntados = { unidades: 0, outros: 0 }; // idem: a desduplicação roda na carga
   const ETAPAS_BASE = ["Terreno / Preparação","Fundação","Estrutura","Alvenaria / Vedação","Cobertura","Instalações","Revestimento / Reboco","Esquadrias","Acabamento","Entrega / Habite-se","Pós-obra"];
@@ -1427,6 +1427,7 @@
     unidSel.value = unidAtualId;
 
     document.getElementById("btnUnidadesPorAndar").style.display = (emp.tipo==="predio" && emp.areasComuns) ? "inline" : "none";
+    document.getElementById("btnMoldeLazer").style.display = (unidAtualId==="__areas_comuns__") ? "inline" : "none";
     document.getElementById("tituloTopo").textContent = emp.nome;
     let nomeCtx;
     if (unidAtualId==="__areas_comuns__") nomeCtx = "Áreas Comuns";
@@ -1438,6 +1439,7 @@
   document.getElementById("empSelect").addEventListener("change", (e)=>{
     empAtualId = e.target.value;
     unidAtualId = contextoPadrao(getEmp(empAtualId));
+    toast("Agora em: " + getEmp(empAtualId).nome); // destaque de troca — fácil de confundir empreendimento sem isso (pedido dele, 23/09)
     andarAtualId = null; abertos = {};
     renderTudo();
   });
@@ -1688,6 +1690,9 @@
     document.getElementById("modalEmp").classList.remove("aberto");
     renderTudo();
     toast("Empreendimento criado");
+    // prédio: a tela andar a andar abre sozinha, já com o padrão usado no cadastro — pedido dele, 23/09 (prédio real
+    // com pavimento misto e cobertura duplex precisa de ajuste andar a andar logo depois de criar)
+    if (tipoReal === "predio" && novoEmp.areasComuns) abrirEditorUnidadesPorAndar();
   });
 
   document.getElementById("btnNovaUnid").addEventListener("click", async ()=>{
@@ -1725,6 +1730,33 @@
     toast("Andar/setor adicionado");
   });
 
+  // ---------- Molde: andar de lazer (Felype, 23/09 — andar misto tem apto + salão/jogos/academia/piscina/WCs/lavanderia) ----------
+  const MOLDE_ANDAR_LAZER = ["Salão de Festas","Salão de Jogos","Academia","Playground","Piscina","Lavanderia","WC feminino","WC masculino","WC externo feminino","WC externo masculino","Corredor"];
+  document.getElementById("btnMoldeLazer").addEventListener("click", async ()=>{
+    if (unidAtualId !== "__areas_comuns__"){ await avisar("Só nas Áreas Comuns", 'O molde de andar de lazer é pras Áreas Comuns do prédio. Troque "Unidade / Setor" pra "— Áreas Comuns —" e escolha o andar antes.'); return; }
+    const andar = getAndarAtual();
+    if (!andar){ await avisar("Sem andar", "Este setor ainda não tem andar. Usa '+ Adicionar andar/setor' primeiro."); return; }
+    if (ehAndarFachadas(andar)){ await avisar("Não é aqui", '"Fachadas" é o checklist dos lados de fora do prédio — o molde de lazer é pra um ANDAR (ex.: "2° Andar"). Troque de aba antes.'); return; } // achado confere-no-disco 24/09: a guarda só olhava "Áreas Comuns", não qual andar
+    const existentes = new Set(andar.ambientes.map(a => nomeNorm(a.nome)));
+    const faltam = MOLDE_ANDAR_LAZER.filter(n => !existentes.has(nomeNorm(n)));
+    if (!faltam.length){ toast("Esse andar já tem todos os ambientes do molde"); return; }
+    const ok = await pedirConfirmacao("Molde: andar de lazer", 'Vai adicionar em "' + andar.nome + '":\n' + faltam.join(", ") + (faltam.length < MOLDE_ANDAR_LAZER.length ? "\n\n(Os outros já existem aqui — não duplica.)" : ""), "Adicionar");
+    if (!ok) return;
+    const andarAgora = getAndarAtual(); // outra aba pode ter mexido enquanto o modal esperava
+    if (!andarAgora){ toast("Esse andar já não existe"); renderTudo(); return; }
+    const existentesAgora = new Set(andarAgora.ambientes.map(a => nomeNorm(a.nome)));
+    const antes = andarAgora.ambientes.slice();
+    let n = 0;
+    for (const nome of MOLDE_ANDAR_LAZER){
+      if (existentesAgora.has(nomeNorm(nome))) continue;
+      andarAgora.ambientes.push(novoAmbiente(nome));
+      existentesAgora.add(nomeNorm(nome)); n++;
+    }
+    if (!salvarEstado()){ andarAgora.ambientes = antes; renderTudo(); return; }
+    renderTudo();
+    toast(n + " ambiente(s) adicionado(s)");
+  });
+
   // ---------- Unidades por andar (prédio): 3° andar com 3 → 301, 302, 303 ----------
   function ehAndarNumerado(andar){ return /^\s*\d+\s*[°º]?\s*(andar|pav)/i.test(andar.nome); }
   function prefixoUnidade(andar){
@@ -1748,9 +1780,10 @@
     }
     return criadas;
   }
-  document.getElementById("btnUnidadesPorAndar").addEventListener("click", ()=>{
+  // reaproveitada pelo botão E pelo auto-abrir depois de criar um prédio (pedido dele, 23/09)
+  function abrirEditorUnidadesPorAndar(){
     const emp = getEmp(empAtualId);
-    if (!emp.areasComuns) return;
+    if (!emp || !emp.areasComuns) return;
     const lista = document.getElementById("unidadesPorAndarLista");
     lista.innerHTML = "";
     for (const andar of emp.areasComuns.andares){
@@ -1763,12 +1796,13 @@
          </div>`);
     }
     document.getElementById("modalUnidades").classList.add("aberto");
-  });
+  }
+  document.getElementById("btnUnidadesPorAndar").addEventListener("click", abrirEditorUnidadesPorAndar);
   document.getElementById("unidadesCancelar").onclick = () => document.getElementById("modalUnidades").classList.remove("aberto");
   document.getElementById("unidadesConfirmar").addEventListener("click", async ()=>{
     const emp0 = getEmp(empAtualId);
     if (!emp0 || !emp0.areasComuns) return;
-    const mapa = {}, menores = []; let erro = null, novas = 0;
+    const mapa = {}, excluir = [], bloqueadas = []; let erro = null, novas = 0;
     document.querySelectorAll("#unidadesPorAndarLista [data-unid-andar]").forEach(inp => {
       if (erro) return;
       const idAndar = inp.getAttribute("data-unid-andar");
@@ -1776,25 +1810,54 @@
       const r = lerQuantidade(inp.value, andar ? andar.nome : "Andar", 40, true);
       if (!r.ok){ erro = r.msg; return; }
       mapa[idAndar] = r.n;
-      const existentes = emp0.unidades.filter(u => u.andarRef === idAndar).length;
-      novas += Math.max(0, r.n - existentes);
-      // andar com MENOS que o que já existe: o app só cria, nunca apaga sozinho — sem avisar, parecia que "não funcionou"
-      if (!r.vazio && r.n < existentes) menores.push((andar ? andar.nome : "Andar") + ": você pediu " + r.n + ", já tem " + existentes);
+      const unidsAndar = emp0.unidades.filter(u => u.andarRef === idAndar);
+      novas += Math.max(0, r.n - unidsAndar.length);
+      if (!r.vazio && r.n < unidsAndar.length){
+        // baixar quantidade de verdade (pedido dele, 23/09): apaga só quem está ACIMA do que ele quer manter e não tem foto —
+        // nunca decide sozinho qual apagar se alguma das "excedentes" tiver foto (protegida, igual ao resto do app)
+        const excesso = unidsAndar.filter(u => (u.numero||0) > r.n);
+        const comFoto = excesso.filter(fotosDeUnid).map(u=>u.nome);
+        const semFoto = excesso.filter(u => !fotosDeUnid(u));
+        if (comFoto.length) bloqueadas.push((andar ? andar.nome : "Andar") + ": " + comFoto.join(", ") + " tem foto — não mexida");
+        excluir.push(...semFoto.map(u => ({ id: u.id, nome: u.nome })));
+      }
     });
     if (erro){ await avisar("Confere os números", erro); return; }
     if (novas > 0 && emp0.unidades.length + novas > 800){
       const ok = await pedirConfirmacao("Muitas unidades", "Isso deixa o prédio com ~" + (emp0.unidades.length + novas) + " unidades — perto do que cabe no espaço que o navegador reserva pra estes registros. Criar mesmo assim?", "Criar mesmo assim");
       if (!ok) return;
     }
+    if (excluir.length){
+      const ok = await pedirConfirmacao("Excluir " + excluir.length + " unidade(s) vazia(s)", "Vai excluir (nenhuma tem foto):\n" + excluir.map(x=>x.nome).join(", ") + (bloqueadas.length ? "\n\nCom foto — protegidas, não mexidas:\n" + bloqueadas.join("\n") : ""), "Excluir e continuar");
+      if (!ok) return;
+    } else if (bloqueadas.length){
+      await avisar("Não apaguei nenhuma unidade", bloqueadas.join("\n") + '\n\nEssas têm foto — pra tirar, exclua as fotos antes ou use "✎ editar unidade".');
+    }
     const emp = getEmp(emp0.id);
     if (!emp || !emp.areasComuns){ toast("Esse empreendimento já não existe"); renderTudo(); return; }
-    const antes = emp.unidades.slice();
+    const antes = emp.unidades.slice(), removidosAntes = (estado.removidos||[]).slice(); // desfazer tem de incluir as lápides — senão "não salvei" some sozinho depois (achado confere-o-limite, 24/09)
+    let removidas = 0; const pouparam = [];
+    for (const x of excluir){
+      const u = emp.unidades.find(y => y.id === x.id);
+      if (!u) continue; // sumiu (outra aba já excluiu) — nada a fazer
+      if (fotosDeUnid(u)){ pouparam.push(u.nome); continue; } // ganhou foto agora, entre a confirmação e aqui — protegida
+      marcarRemovido(u.id);
+      emp.unidades = emp.unidades.filter(y => y.id !== u.id);
+      removidas++;
+    }
     const criadas = gerarUnidadesPorAndar(emp, mapa);
-    if (!salvarEstado()){ emp.unidades = antes; renderTudo(); return; } // não coube: desfaz na memória (senão as ações seguintes falham com o mesmo aviso)
+    // não coube: desfaz TAMBÉM as lápides recém-criadas — sem isso, "não salvei" era mentira: a próxima gravação
+    // (ou junção com outro celular) apagava essas unidades do mesmo jeito, sem avisar (mesma classe de comReversao)
+    if (!salvarEstado()){ emp.unidades = antes; estado.removidos = removidosAntes; renderTudo(); return; }
     document.getElementById("modalUnidades").classList.remove("aberto");
     renderTudo();
-    toast(criadas ? (criadas + " unidade(s) criada(s)") : "Nada novo pra criar — já existiam");
-    if (menores.length) await avisar("Não apaguei nenhuma unidade", "Aqui o app só CRIA unidades — nunca apaga sozinho. Nestes andares você pediu menos do que já existe:\n" + menores.join("\n") + '\n\nPra tirar as que sobram: escolha a unidade e toque em "✎ editar unidade" → Excluir (só dá pra excluir unidade sem fotos).');
+    const partes = [];
+    if (criadas) partes.push(criadas + " criada(s)");
+    if (removidas) partes.push(removidas + " excluída(s)");
+    toast(partes.length ? partes.join(", ") : "Nada novo pra criar — já existiam");
+    // achado confere-no-disco/confere-o-limite 24/09: confirmar "excluir" e a unidade sobreviver (ganhou foto no meio do
+    // caminho) precisa dizer isso — senão parece que a exclusão não fez nada, sem explicar por quê
+    if (pouparam.length) await avisar("Uma unidade ganhou foto e não foi excluída", pouparam.join(", ") + ' recebeu foto/vídeo bem na hora da confirmação — por segurança, não foi apagada. Se quiser mesmo excluir, revise e confirme de novo.');
   });
 
   // ---------- Casas geminadas: marcar o empreendimento e dar a posição de cada casa ----------
@@ -1847,7 +1910,16 @@
       msg: "Casa geminada encosta na vizinha pela lateral: esse lado não dá pra fotografar. As do meio só têm frente e fundos; as das pontas têm também o lado livre.\n\nQuantas casas tem em CADA fileira colada? (5 casas coladas numa fileira só = 5. Duas fileiras de 3 = 3.)" });
     if (rec === null) return;
     const q = lerQuantidade(rec, "Casas por fileira", nCasas);
-    if (!q.ok || q.n < 1){ await avisar("Confere o número", q.ok ? "Digite quantas casas tem em cada fileira colada: de 1 até " + nCasas + "." : q.msg); return; }
+    if (q.ok && q.n < 1){ await avisar("Confere o número", "Digite quantas casas tem em cada fileira colada: de 1 até " + nCasas + "."); return; }
+    if (!q.ok){
+      const numsRec = (String(rec||"").match(/\d+/g) || []).map(x => parseInt(x, 10));
+      if (numsRec.length === 1 && numsRec[0] > nCasas){
+        const nomes = emp0.unidades.map(u => u.nome).join(", ");
+        await avisar("Cadastre as casas que faltam antes", 'Você digitou ' + numsRec[0] + ', mas este empreendimento tem ' + nCasas + ' casa(s) cadastrada(s) até agora (' + nomes + '). Não existe limite de quantas casas cabem numa fileira colada — o número só precisa bater com o que já está cadastrado aqui. Toque em "+ Unidade" e cadastre as que faltam; depois volte em "Casas geminadas" com o número certo.');
+        return;
+      }
+      await avisar("Confere o número", q.msg); return;
+    }
     // de que lado fica a primeira casa da lista? (só existe pra fileira de 2+ casas) — errar isso põe o nome "esquerda/direita" na lateral errada
     let invertido = false;
     if (q.n >= 2){

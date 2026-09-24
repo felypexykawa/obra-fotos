@@ -21,6 +21,7 @@ blocos.forEach((b, i) => { try { new Function(b); } catch (e) { falha('bloco <sc
 
 // 2) capacidades que este app precisa ter (nome → o que a ausência significaria para o Felype)
 const CAPACIDADES = {
+  'btnMoldeLazer': 'molde de andar de lazer', 'MOLDE_ANDAR_LAZER': 'lista dos 11 ambientes do molde de lazer', 'abrirEditorUnidadesPorAndar': 'editor andar a andar (botão + auto-abre após criar prédio)', 'position:sticky': 'destaque do empreendimento selecionado (header fixo ao rolar)',
   'comprimirVideoRapido': 'vídeo não compacta (WebCodecs)', 'CODIGO_WORKER_VIDEO': 'worker de vídeo', 'function comprimirVideo(': 'rota antiga de vídeo',
   'agendarCompactacao': 'fila de compactação', 'retomarCompactacoes': 'retomada ao abrir', 'tentativas': 'limite de tentativas do vídeo', 'guardarCopiaNoCelular': 'cópia no celular (Download) do que a câmera do app tira', 'ehExemploIntocado': 'exemplo de fábrica sem nome de projeto real', 'mostrarAvisoExemplo': 'aviso do exemplo alcança quem já tinha modo salvo', 'btnEditarEmp': 'renomear/excluir empreendimento', 'parseListaNumeros': 'garagem marcada andar a andar', 'ehAndarGaragem': 'garagem exclui unidade automatica',
   'fundirEstados': 'junção de backups/abas', 'function casar(': 'junção por nome', 'marcarRemovido': 'lápides', 'podarLapides': 'poda por lápide',
