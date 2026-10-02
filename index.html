@@ -665,7 +665,8 @@
     return new Promise((resolve,reject)=>{
       const tx = db.transaction(STORE,"readwrite");
       tx.objectStore(STORE).put(blob, id);
-      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+      // aparelho cheio costuma ABORTAR a transação (não dispara onerror): sem onabort a promessa nunca resolve e o lote fica parado calado
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error("gravação abortada (provável falta de espaço)"));
     });
   }
   async function idbGet(id){
@@ -2582,6 +2583,10 @@
       if (lote) return { ok: false, parar: !abrindo, motivo: abrindo ? "naoAbriu" : (semEspaco ? "espaco" : "erro") };
       if (abrindo && ctx.origem === "arrastar"){
         await avisar("Não consegui abrir", "O navegador não consegue abrir \"" + file.name + "\" — formato que ele não lê (no computador, foto HEIC do iPhone é o caso comum). Nada foi gravado. Converta para JPG, ou adicione pelo celular.");
+        return { ok: false, parar: false, motivo: "naoAbriu" };
+      }
+      if (abrindo){ // arquivo que o navegador não decodifica não é falta de espaço: mandar "libere espaço" faz a pessoa apagar coisa à toa
+        await avisar("Não consegui abrir", "O app não consegue abrir \"" + file.name + "\" — formato que o navegador não lê ou arquivo danificado. Nada foi gravado" + (daCamera ? "; tira a foto de novo." : "; a foto continua na galeria do celular."));
         return { ok: false, parar: false, motivo: "naoAbriu" };
       }
       const causa = "O app não conseguiu gravar" + (semEspaco ? " (sem espaço no aparelho)" : "") + ". ";
