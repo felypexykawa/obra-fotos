@@ -61,6 +61,7 @@
   .foto-thumb .mini-btns{position:absolute;bottom:0;left:0;right:0;display:flex;background:rgba(0,0,0,.55);}
   .foto-thumb .mini-btns button{flex:1;border:none;background:transparent;color:#fff;font-size:12px;padding:3px 0;}
   .btn-add-foto{width:74px;height:74px;border-radius:8px;border:2px dashed #c9c5bc;background:transparent;color:var(--sub);font-size:11px;}
+  .btn-add-foto.alvo-soltar{border-style:solid;border-color:var(--accent);background:#fdece9;color:var(--accent-dark);font-weight:600;box-shadow:0 0 0 3px rgba(178,59,46,.25);}
   .btn-add-parede{margin-top:10px;width:100%;padding:9px;border-radius:8px;border:1px dashed var(--sub);background:transparent;color:var(--sub);font-size:13px;}
   .rodape-acoes{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;gap:8px;padding:8px 10px;}
   .rodape-acoes button{flex:1;padding:11px 0;border-radius:8px;border:1px solid var(--line);background:#fafaf8;font-size:12px;font-weight:600;color:var(--ink);}
@@ -175,7 +176,7 @@
   <button id="btnCopiaCelular" type="button" title="Liga/desliga: quando ligado, toda foto/vídeo tirado pelo app também salva uma cópia na galeria normal do celular, por segurança">📥 Cópia no celular</button>
 </div>
 <input type="file" id="inputImportar" accept="application/json" multiple hidden>
-<input type="file" id="inputFoto" accept="image/*,video/*" hidden>
+<input type="file" id="inputFoto" accept="image/*,video/*" multiple hidden>
 <input type="file" id="inputFotoCam" accept="image/*" capture="environment" hidden>
 <input type="file" id="inputVideoCam" accept="video/*" capture="environment" hidden>
 <div class="modal-fundo" id="modalCaptura">
@@ -183,7 +184,8 @@
     <h3>Registrar</h3>
     <button type="button" class="cap-opcao" id="capFoto" title="Abre a câmera direto pra tirar a foto agora — não passa pela galeria">📷 Tirar foto agora</button>
     <button type="button" class="cap-opcao" id="capVideo" title="Abre a câmera direto pra gravar um vídeo agora — não passa pela galeria">🎥 Gravar vídeo agora</button>
-    <button type="button" class="cap-opcao" id="capGaleria" title="Escolhe uma foto ou vídeo que já está salvo no celular, em vez de gravar agora">🖼️ Escolher da galeria</button>
+    <button type="button" class="cap-opcao" id="capGaleria" title="Escolhe fotos ou vídeos que já estão salvos no aparelho — dá para marcar VÁRIOS de uma vez, e todos entram neste ponto">🖼️ Escolher da galeria (uma ou várias)</button>
+    <p id="capAvisoIphone" hidden style="font-size:12px;line-height:1.4;color:#5a4a20;background:#fff8ec;border:1px solid #eadfc0;border-radius:8px;padding:8px 10px;margin:6px 0 0;">No iPhone, se 'Tirar foto agora' não abrir a câmera: Ajustes → Safari → Câmera → Permitir, e abra o app pelo Safari (não por dentro do WhatsApp). Enquanto isso, use 'Escolher da galeria'.</p>
     <p id="capNota" style="font-size:12px;color:#666;margin:6px 2px 0;"></p>
     <div class="modal-acoes"><button type="button" class="cancelar" id="capCancelar">Cancelar</button></div>
   </div>
@@ -202,6 +204,7 @@
 <div class="toast" id="toast"></div>
 <div id="avisoVersao" style="display:none;position:fixed;bottom:118px;left:10px;right:10px;background:#1f4e79;color:#fff;padding:10px 40px 10px 12px;border-radius:8px;font-size:13px;z-index:85;box-shadow:0 2px 10px rgba(0,0,0,.3);">Tem uma versão nova do app. <button id="btnRecarregar" type="button" style="margin-left:8px;padding:6px 10px;border:0;border-radius:6px;background:#fff;color:#1f4e79;font-weight:600;">Atualizar agora</button><button id="btnFecharAviso" type="button" aria-label="Fechar" style="position:absolute;top:6px;right:8px;border:0;background:transparent;color:#fff;font-size:18px;line-height:1;">×</button></div>
 <div id="progressoVideo" style="display:none;position:fixed;top:0;left:0;right:0;background:#222;color:#fff;font-size:13px;padding:10px 14px;text-align:center;z-index:80;"></div>
+<div id="progressoLote" role="status" aria-live="polite" style="display:none;position:fixed;top:0;left:0;right:0;background:#1f5e3a;color:#fff;font-size:13px;padding:10px 14px;text-align:center;z-index:81;"></div>
 
 <!-- Página inicial: escolha do modo (só aparece quando ainda não há modo salvo) -->
 <div class="modal-fundo" id="modalModo">
@@ -1571,6 +1574,7 @@
         addBtn.type = "button";
         addBtn.className = "btn-add-foto";
         addBtn.textContent = "+ Foto/Vídeo";
+        addBtn.title = "Adiciona foto ou vídeo neste ponto: tirar agora, gravar ou escolher da galeria (dá para marcar várias de uma vez). No computador, dá também para arrastar os arquivos e soltar aqui.";
         addBtn.setAttribute("data-add", amb.id + "|" + p.id);
         const gridSolto = document.createElement("div");
         gridSolto.className = "fotos-grid";
@@ -2391,70 +2395,167 @@
     renderCopia(); toast(on ? "Cópia no celular desligada" : "Cópia no celular ligada: cada foto tirada por aqui vai também para Download");
   });
   renderCopia();
-  function abrirCaptura(){ document.getElementById("modalCaptura").classList.add("aberto"); }
+  // Galeria: VÁRIAS de uma vez para ADICIONAR (02/10/2026 — a Fabyane carregava uma a uma porque a galeria não deixava
+  // marcar várias). A fonte é o atributo "multiple" do #inputFoto no HTML, lido UMA vez aqui: desligar a propriedade
+  // apaga o atributo. No REFAZER a galeria abre para uma só — refazer troca uma foto por outra (e no celular a escolha
+  // de uma só fecha no toque, sem o passo extra de "Adicionar").
+  const GALERIA_VARIAS = document.getElementById("inputFoto").hasAttribute("multiple");
+  function galeriaVarias(){ return GALERIA_VARIAS && !(pendente && pendente.replaceId); }
+  function abrirCaptura(){
+    const g = document.getElementById("capGaleria"), varias = galeriaVarias();
+    g.textContent = varias ? "🖼️ Escolher da galeria (uma ou várias)" : "🖼️ Escolher da galeria";
+    g.title = varias ? "Escolhe fotos ou vídeos que já estão salvos no aparelho — dá para marcar VÁRIOS de uma vez, e todos entram neste ponto" : "Escolhe a foto ou o vídeo (um só) que vai substituir este registro";
+    document.getElementById("modalCaptura").classList.add("aberto");
+  }
   function fecharCaptura(){ document.getElementById("modalCaptura").classList.remove("aberto"); }
+  // iPhone/iPad (o iPad novo se apresenta como Mac, mas tem tela de toque): lá "Tirar foto agora" não abriu nada no
+  // celular da Fabyane (02/10/2026) — câmera negada ao Safari, ou app aberto por dentro do WhatsApp. O aviso só aparece lá.
+  function ehIOS(){ const ua = navigator.userAgent || ""; return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1); }
+  document.getElementById("capAvisoIphone").hidden = !ehIOS();
   document.getElementById("capFoto").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputFotoCam").click(); });
   document.getElementById("capVideo").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputVideoCam").click(); });
-  document.getElementById("capGaleria").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputFoto").click(); });
+  document.getElementById("capGaleria").addEventListener("click", ()=>{ const inp = document.getElementById("inputFoto"); inp.multiple = galeriaVarias(); fecharCaptura(); inp.click(); });
   document.getElementById("capCancelar").addEventListener("click", ()=>{ fecharCaptura(); pendente = null; });
   for (const id of ["inputFoto","inputFotoCam","inputVideoCam"]) document.getElementById(id).addEventListener("change", aoEscolherArquivo);
   async function aoEscolherArquivo(e){
-    const file = e.target.files[0];
+    const arquivos = Array.from(e.target.files || []); // copia ANTES de limpar o campo: a lista do campo é viva e esvazia junto
+    const origem = e.target.id === "inputFoto" ? "galeria" : "camera";
     e.target.value = "";
     const alvo = pendente;
     pendente = null;
-    if (!file || !alvo) return;
+    return adicionarArquivos(arquivos, alvo, origem);
+  }
+
+  // ---------- Adicionar: uma ou várias de uma vez ----------
+  // Várias de uma vez (galeria com várias marcadas; arrastar e soltar no computador): cada arquivo passa pelo MESMO
+  // caminho de uma foto só (adicionarUmArquivo), em sequência, no mesmo ponto — o "pendente" vale para o lote inteiro.
+  // Lote só se diz concluído com TODOS dentro (antipadrão 89 da skill 21): se parar no meio (sem espaço, ponto que
+  // sumiu), o que já entrou fica, o que falhou é desfeito, e o aviso diz quantos entraram, quantos não e quais.
+  // A câmera do app entrega um arquivo por vez ("capture" não tem várias) e segue no caminho de um só, igual à v7.7.
+  let timerLote = 0;
+  function mostrarProgressoLote(txt, someEmMs){
+    const el = document.getElementById("progressoLote"); clearTimeout(timerLote);
+    el.textContent = txt; el.style.display = "block";
+    if (someEmMs) timerLote = setTimeout(()=>{ el.style.display = "none"; }, someEmMs);
+  }
+  function esconderProgressoLote(){ clearTimeout(timerLote); document.getElementById("progressoLote").style.display = "none"; }
+  async function adicionarArquivos(arquivos, alvo, origem){
+    if (!arquivos || !arquivos.length || !alvo) return;
+    let lista = Array.from(arquivos);
     const quem = document.getElementById("quemSelect").value;
+    if (alvo.replaceId && lista.length > 1){ // refazer troca UMA foto (a galeria já abre para uma só no refazer; isto é só proteção)
+      toast("Refazer troca uma foto só — usei a primeira das " + lista.length + " escolhidas");
+      lista = lista.slice(0, 1);
+    }
+    if (lista.length === 1) return adicionarUmArquivo(lista[0], alvo, { quem, origem }); // um só: o caminho da v7.7, intacto
+    // sem WebCodecs, a rota antiga de vídeo só pode começar AGORA, ainda dentro do toque (senão o celular bloqueia o
+    // áudio) — vale para o PRIMEIRO vídeo do lote; os outros ficam com o original, como o vídeo que retoma ao reabrir
+    let legado = null;
+    const iVideo = lista.findIndex(f => String(f.type || "").startsWith("video/"));
+    if (iVideo >= 0 && !VIDEO_RAPIDO_OK){
+      const token = { cancelado: false };
+      legado = { indice: iVideo, token, usado: false, promessa: comprimirVideo(lista[iVideo], (p)=>mostrarProgressoVideo(p, 0, true), token) };
+    }
+    const total = lista.length;
+    let entraram = 0, videos = 0, filtroMudou = false, parouEm = -1, motivoParada = "";
+    const deFora = []; // os que ficaram de fora SEM parar o lote (foto que o navegador não abre, vídeo grande recusado)
+    for (let i = 0; i < total; i++){
+      mostrarProgressoLote("Adicionando " + (i + 1) + " de " + total + "…");
+      let r;
+      try{ r = await adicionarUmArquivo(lista[i], alvo, { quem, origem, lote: true, legado: (legado && legado.indice === i) ? legado : null }); }
+      catch(err){ console.error(err); r = { ok: false, parar: true, motivo: "erro" }; }
+      if (r.ok){ entraram++; if (r.video) videos++; if (r.filtroMudou) filtroMudou = true; continue; }
+      if (r.parar){ parouEm = i; motivoParada = r.motivo; break; }
+      deFora.push({ i, motivo: r.motivo });
+    }
+    if (legado && !legado.usado){ legado.token.cancelado = true; legado.promessa.then(()=>esconderProgressoVideo()); }
+    if (entraram === total){
+      mostrarProgressoLote("✓ " + total + " adicionadas" + (videos ? " · " + videos + (videos === 1 ? " vídeo compactando" : " vídeos compactando") + " em segundo plano" : "") + (filtroMudou ? " · filtro voltou pra 'todas'" : ""), 3500);
+      return;
+    }
+    // parcial: nunca em silêncio — quantos entraram, quantos não, por quê e QUAIS (para escolher de novo só esses)
+    esconderProgressoLote();
+    const nomeDe = i => "\"" + (lista[i].name || ("arquivo " + (i + 1))) + "\"";
+    const faltaram = deFora.map(d => d.i);
+    if (parouEm >= 0) for (let i = parouEm; i < total; i++) faltaram.push(i);
+    faltaram.sort((a, b) => a - b);
+    const linhas = ["Entraram " + entraram + " de " + total + " neste ponto. Não entraram " + (total - entraram) + "."];
+    if (parouEm >= 0){
+      const porque = motivoParada === "gravar" ? "não consegui gravar o registro (o aviso anterior explica o porquê)"
+        : motivoParada === "espaco" ? "o aparelho ficou sem espaço"
+        : motivoParada === "ponto" ? "o ponto de registro mudou no meio (troca de andar, ou outra janela mexeu nele)"
+        : "deu erro ao gravar";
+      const depois = total - parouEm - 1;
+      linhas.push("Parei no " + (parouEm + 1) + "º (" + nomeDe(parouEm) + "): " + porque + ". Nada dele ficou gravado" + (depois === 1 ? "; o seguinte não foi tentado." : depois ? "; os " + depois + " seguintes não foram tentados." : "."));
+    }
+    const naoAbriu = deFora.filter(d => d.motivo === "naoAbriu"), recusados = deFora.filter(d => d.motivo === "recusado");
+    if (naoAbriu.length) linhas.push("Não consegui abrir: " + naoAbriu.map(d => nomeDe(d.i)).join(", ") + " — formato que este navegador não lê (no computador, foto HEIC do iPhone é o caso comum).");
+    if (recusados.length) linhas.push("Você deixou de fora: " + recusados.map(d => nomeDe(d.i)).join(", ") + " (vídeo grande demais).");
+    linhas.push("Os que faltaram: " + faltaram.slice(0, 10).map(nomeDe).join(", ") + (faltaram.length > 10 ? " e mais " + (faltaram.length - 10) : "") + ". " + (origem === "arrastar" ? "Arraste de novo só esses." : "Escolha de novo só esses."));
+    await avisar("Entraram " + entraram + " de " + total, linhas.join("\n\n"));
+  }
+  // UM arquivo, pelo caminho de sempre (o da v7.7, intacto para uma foto só): comprime (foto) ou guarda o original
+  // (vídeo) → grava o arquivo → mexe na árvore → grava a árvore → só então apaga o arquivo antigo (refazer). Se a árvore
+  // não gravar (sem espaço), desfaz e apaga o arquivo novo. ctx: { quem, origem: galeria|camera|arrastar, lote, legado }.
+  // No lote, os avisos de CADA arquivo ficam calados (quem chamou junta tudo num resumo só). Devolve { ok:true, video,
+  // filtroMudou } ou { ok:false, parar, motivo }: parar=true quando não adianta tentar os próximos (sem espaço, ponto
+  // sumiu, erro ao gravar); parar=false quando só este ficou de fora (foto que o navegador não abre, vídeo recusado).
+  async function adicionarUmArquivo(file, alvo, ctx){
+    const quem = ctx.quem, lote = !!ctx.lote;
     const ehVideo = file.type.startsWith("video/");
     // a parede é re-resolvida por id depois de cada await: outra aba pode ter trocado a árvore no meio
     const acharParede = ()=>{ const an = getAndarAtual(); const a = an && an.ambientes.find(a=>a.id===alvo.ambienteId); return (a && a.paredes.find(p=>p.id===alvo.paredeId)) || null; };
     // veio da câmera do app (não da galeria, onde o arquivo já mora no celular): cópia no aparelho ANTES de qualquer
     // recusa ou gravação — o que foi fotografado agora não existe em mais lugar nenhum
-    const daCamera = e.target.id !== "inputFoto";
+    const daCamera = ctx.origem === "camera";
     const copiou = (daCamera && copiaLigada()) ? guardarCopiaNoCelular(file, nomeDaCopia(alvo, file)) : false;
-    if (!acharParede()){ toast(copiou ? "Esse ambiente mudou — a foto foi mandada para o Download do celular; abre de novo e adiciona pela galeria" : "Esse ambiente mudou — abre de novo e tenta outra vez"); return; }
+    if (!acharParede()){ if (!lote) toast(copiou ? "Esse ambiente mudou — a foto foi mandada para o Download do celular; abre de novo e adiciona pela galeria" : "Esse ambiente mudou — abre de novo e tenta outra vez"); return { ok: false, parar: true, motivo: "ponto" }; }
     // sem WebCodecs, a rota antiga (canvas) precisa começar AGORA, dentro do toque — senão o celular bloqueia o áudio.
+    // No lote, quem chamou já a começou dentro do toque para o primeiro vídeo e a entrega em ctx.legado.
     // Se o fluxo abortar antes de agendar, o token cancela a rota antiga (senão ela rodaria até o fim com a faixa presa).
-    const tokenLegado = { cancelado: false };
-    const promessaLegada = (ehVideo && !VIDEO_RAPIDO_OK) ? comprimirVideo(file, (p)=>mostrarProgressoVideo(p, 0, true), tokenLegado) : null;
+    const tokenLegado = ctx.legado ? ctx.legado.token : { cancelado: false };
+    const promessaLegada = ctx.legado ? ctx.legado.promessa : ((ehVideo && !VIDEO_RAPIDO_OK && !lote) ? comprimirVideo(file, (p)=>mostrarProgressoVideo(p, 0, true), tokenLegado) : null);
     let agendado = false;
     const abortarLegado = ()=>{ if (promessaLegada && !agendado){ tokenLegado.cancelado = true; promessaLegada.then(()=>esconderProgressoVideo()); } };
+    let abrindo = false; // true enquanto o navegador abre/reduz a foto: falhar AÍ é arquivo que ele não lê, não falta de espaço
     try{
       let blob;
       if (ehVideo){
         if (file.size > 250e6){
           const ok = await pedirConfirmacao("Vídeo muito grande", "Esse vídeo tem " + mb(file.size) + " — vai pesar no app e a compactação pode falhar." + (copiou ? " Uma cópia dele já foi mandada para a pasta Download do celular." : "") + " Salvar no app mesmo assim?", "Salvar mesmo assim");
-          if (!ok){ abortarLegado(); if (copiou) toast("Vídeo não entrou no app — a cópia está na pasta Download do celular"); return; }
+          if (!ok){ abortarLegado(); if (copiou) toast("Vídeo não entrou no app — a cópia está na pasta Download do celular"); return { ok: false, parar: false, motivo: "recusado" }; }
         }
         blob = file; // o original entra JÁ; a compactação roda em segundo plano e troca o arquivo depois
       } else {
-        blob = await compressImage(file);
+        abrindo = true; blob = await compressImage(file); abrindo = false;
       }
       // ordem que não perde nada: grava o arquivo novo → mexe na árvore → grava a árvore → só então apaga o
       // arquivo antigo. Se a árvore não gravar (sem espaço), desfaz e apaga o arquivo novo.
-      let idGravado = null, apagarDepois = null, msg = "", fotoAlterada = null, antes = null;
+      let idGravado = null, apagarDepois = null, msg = "", fotoAlterada = null, antes = null, avisoFiltro = "";
       if (alvo.replaceId){
         const novoId = novoIdFoto(quem);
         await idbPut(novoId, blob);
         const parede = acharParede();
         const foto = parede && parede.fotos.find(f=>f.id===alvo.replaceId);
-        if (!foto){ await idbDelete(novoId); toast("Esse registro não existe mais"); abortarLegado(); return; }
+        if (!foto){ await idbDelete(novoId); toast("Esse registro não existe mais"); abortarLegado(); return { ok: false, parar: true, motivo: "registro" }; }
         antes = Object.assign({}, foto); fotoAlterada = foto; apagarDepois = alvo.replaceId;
         marcarRemovido(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
         foto.compactando = ehVideo; foto.tamanho = blob.size; delete foto.comprimido; foto.tentativas = 0;
         if (!foto.etapa) foto.etapa = etapaParaNovaFoto(); // foto antiga sem etapa ganha a atual ao ser refeita
         idGravado = novoId;
-        msg = "Atualizado" + (ehVideo ? " · vídeo salvo, compactando em segundo plano" : "") + garantirVisivel(foto);
+        avisoFiltro = garantirVisivel(foto);
+        msg = "Atualizado" + (ehVideo ? " · vídeo salvo, compactando em segundo plano" : "") + avisoFiltro;
       } else {
         const id = novoIdFoto(quem);
         await idbPut(id, blob);
         const parede = acharParede();
-        if (!parede){ await idbDelete(id); toast("Esse ambiente mudou — abre de novo e tenta outra vez"); abortarLegado(); return; }
+        if (!parede){ await idbDelete(id); if (!lote) toast("Esse ambiente mudou — abre de novo e tenta outra vez"); abortarLegado(); return { ok: false, parar: true, motivo: "ponto" }; }
         const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFoto(), compactando: ehVideo, tamanho: blob.size };
         parede.fotos.push(novaFoto);
         idGravado = id;
-        msg = (ehVideo ? "Vídeo salvo · compactando em segundo plano" : "Foto adicionada") + " · " + novaFoto.etapa + garantirVisivel(novaFoto);
+        avisoFiltro = garantirVisivel(novaFoto);
+        msg = (ehVideo ? "Vídeo salvo · compactando em segundo plano" : "Foto adicionada") + " · " + novaFoto.etapa + avisoFiltro;
       }
       if (!salvarEstado()){
         if (fotoAlterada){
@@ -2466,22 +2567,62 @@
         await idbDelete(idGravado);
         if (copiou) avisar("A foto está fora do app", "Não coube no app, mas a foto foi mandada para a pasta Download do celular — confira lá. Libere espaço e adicione de novo pela galeria.");
         abortarLegado(); renderAmbientes();
-        return;
+        return { ok: false, parar: true, motivo: "gravar" };
       }
       if (apagarDepois) await idbDelete(apagarDepois);
-      toast(msg + (copiou ? " · cópia mandada para Download" : ""));
+      if (!lote) toast(msg + (copiou ? " · cópia mandada para Download" : ""));
       renderProgresso(); renderAmbientes();
       avisarEspaco(); // o celular enche DURANTE o uso: reconfere depois de cada gravação, não só na abertura
-      if (ehVideo && idGravado){ agendado = true; agendarCompactacao(idGravado, file, promessaLegada); }
+      if (ehVideo && idGravado){ agendado = true; if (ctx.legado) ctx.legado.usado = true; agendarCompactacao(idGravado, file, promessaLegada); }
+      return { ok: true, video: ehVideo, filtroMudou: !!avisoFiltro };
     } catch(err){
       console.error(err);
       abortarLegado();
       const semEspaco = /quota|space|full/i.test(String(err && (err.name + " " + err.message)));
+      if (lote) return { ok: false, parar: !abrindo, motivo: abrindo ? "naoAbriu" : (semEspaco ? "espaco" : "erro") };
+      if (abrindo && ctx.origem === "arrastar"){
+        await avisar("Não consegui abrir", "O navegador não consegue abrir \"" + file.name + "\" — formato que ele não lê (no computador, foto HEIC do iPhone é o caso comum). Nada foi gravado. Converta para JPG, ou adicione pelo celular.");
+        return { ok: false, parar: false, motivo: "naoAbriu" };
+      }
       const causa = "O app não conseguiu gravar" + (semEspaco ? " (sem espaço no aparelho)" : "") + ". ";
       await avisar("Não consegui salvar", causa + (copiou ? "A foto foi mandada para a pasta Download do celular — confira lá. Libere espaço (apague vídeos antigos ou exporte um backup) e adicione de novo pela galeria."
-        : (!daCamera ? "O arquivo continua na galeria do celular. Libere espaço e tenta de novo." : "Esta foto NÃO ficou guardada em lugar nenhum. Libere espaço (apague vídeos antigos ou exporte um backup) e tire de novo.")));
+        : (ctx.origem === "arrastar" ? "O arquivo continua no computador, na pasta de onde você arrastou. Libere espaço e tenta de novo."
+        : (!daCamera ? "O arquivo continua na galeria do celular. Libere espaço e tenta de novo." : "Esta foto NÃO ficou guardada em lugar nenhum. Libere espaço (apague vídeos antigos ou exporte um backup) e tire de novo."))));
+      return { ok: false, parar: true, motivo: semEspaco ? "espaco" : "erro" };
     }
   }
+
+  // ---------- Arrastar e soltar (computador) ----------
+  // Soltar fotos/vídeos em cima do "+ Foto/Vídeo" de um ponto adiciona naquele ponto, pelo mesmo caminho da galeria
+  // (adicionarArquivos). Fora de um ponto não acontece nada — sem o preventDefault da janela, o navegador abriria o
+  // arquivo na aba, por cima do app. Só age em arrasto de ARQUIVO (texto arrastado para um campo segue como antes).
+  function arrastoDeArquivo(e){ const dt = e.dataTransfer; return !!(dt && dt.types && Array.prototype.indexOf.call(dt.types, "Files") >= 0); }
+  function zonaDeSoltar(e){ const t = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement); return (t && t.closest) ? t.closest("[data-add]") : null; }
+  function ehFotoOuVideo(f){ const t = String((f && f.type) || ""); return t.startsWith("image/") || t.startsWith("video/"); }
+  const listaParaSoltar = document.getElementById("listaAmbientes");
+  for (const tipo of ["dragenter", "dragover"]) listaParaSoltar.addEventListener(tipo, (e)=>{
+    const z = zonaDeSoltar(e); if (!z || !arrastoDeArquivo(e)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "copy"; z.classList.add("alvo-soltar");
+  });
+  listaParaSoltar.addEventListener("dragleave", (e)=>{ const z = zonaDeSoltar(e); if (z) z.classList.remove("alvo-soltar"); });
+  listaParaSoltar.addEventListener("drop", async (e)=>{
+    const z = zonaDeSoltar(e); if (!z || !arrastoDeArquivo(e)) return;
+    e.preventDefault(); z.classList.remove("alvo-soltar");
+    const [ambId, paredeId] = z.getAttribute("data-add").split("|");
+    const todos = Array.from(e.dataTransfer.files || []);
+    const midia = todos.filter(ehFotoOuVideo), ignorados = todos.filter(f => !ehFotoOuVideo(f));
+    if (ignorados.length){
+      const nomes = ignorados.slice(0, 8).map(f => "\"" + f.name + "\"").join(", ") + (ignorados.length > 8 ? " e mais " + (ignorados.length - 8) : "");
+      avisar(midia.length ? "Alguns arquivos ficaram de fora" : "Nada foi adicionado", "Só entram fotos e vídeos. Ignorei " + (ignorados.length === 1 ? "1 arquivo que não é foto nem vídeo: " : ignorados.length + " arquivos que não são foto nem vídeo: ") + nomes + "." + (midia.length ? (midia.length === 1 ? " A foto/vídeo que veio junto está entrando." : " As " + midia.length + " fotos/vídeos que vieram junto estão entrando.") : ""));
+    }
+    if (!midia.length) return;
+    await adicionarArquivos(midia, { ambienteId: ambId, paredeId, replaceId: null }, "arrastar");
+  });
+  // dragenter E dragover: ao entrar num elemento novo o Chrome dispara só o dragenter naquele passo (o dragover vem no
+  // movimento seguinte) — segurar só o dragover deixava uma fresta: soltar logo ao cruzar a borda abria o arquivo na aba
+  // (achado com arrasto de verdade no teste, 02/10/2026)
+  for (const tipo of ["dragenter", "dragover"]) window.addEventListener(tipo, (e)=>{ if (!arrastoDeArquivo(e) || zonaDeSoltar(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = "none"; });
+  window.addEventListener("drop", (e)=>{ if (!arrastoDeArquivo(e) || zonaDeSoltar(e)) return; e.preventDefault(); toast("Solte em cima do \"+ Foto/Vídeo\" de um ponto (abra o ambiente antes)"); });
 
   document.getElementById("quemSelect").addEventListener("change", ()=>{
     localStorage.setItem("obraFotosQuemPadrao", document.getElementById("quemSelect").value);

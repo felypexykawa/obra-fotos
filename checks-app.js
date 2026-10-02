@@ -34,6 +34,14 @@ const CAPACIDADES = {
   "BUILD_TAG='": 'carimbo de versão', 'BUILD_TS=': 'ts de versão', 'checarVersao': 'aviso de versão nova', 'id="buildTag"': 'versão na tela',
   'id="avisoVersao"': 'banner de versão', 'lib/mp4box.all.min.js': 'demuxer', 'lib/mp4-muxer.min.js': 'muxer', 'id="progressoVideo"': 'faixa de progresso',
   'id="inputFoto"': 'botão de foto', 'obraFotosEstado_v4': 'chave de dados da versão',
+  // v7.8 (02/10/2026): várias de uma vez, arrastar no computador, aviso da câmera no iPhone
+  'id="inputFoto" accept="image/*,video/*" multiple': 'galeria deixa marcar várias fotos/vídeos de uma vez',
+  'adicionarArquivos': 'lote: várias de uma vez (galeria e arrastar), com resumo e aviso de parcial',
+  'adicionarUmArquivo': 'caminho único de UMA foto/vídeo, reaproveitado pelo lote',
+  'id="progressoLote"': 'progresso do lote ("Adicionando 3 de 12…")',
+  'addEventListener("drop"': 'arrastar e soltar no "+ Foto/Vídeo" de um ponto',
+  '["dragenter", "dragover"]) window.addEventListener(': 'soltar fora de um ponto não abre o arquivo por cima do app (dragenter E dragover)',
+  'id="capAvisoIphone"': 'aviso de câmera no iPhone (Ajustes → Safari → Câmera)',
 };
 for (const [k, v] of Object.entries(CAPACIDADES)) if (!s.includes(k)) falha('capacidade ausente: ' + k + ' (' + v + ')');
 
