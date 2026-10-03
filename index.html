@@ -660,56 +660,102 @@
       req.onerror = () => reject(req.error);
     });
   }
-  async function idbPut(id, blob){
-    const db = await idbOpen();
-    return new Promise((resolve,reject)=>{
-      const tx = db.transaction(STORE,"readwrite");
-      tx.objectStore(STORE).put(blob, id);
+  // UMA conexão com o banco de fotos, reaproveitada. Antes cada leitura/gravação abria uma conexão nova e nunca a
+  // fechava (num lote de 50 fotos, ~3.850 conexões abertas — revisor confere-o-limite, 02/10/2026). Se o navegador
+  // fechar a conexão, ou outra aba pedir versão nova do banco, esta é esquecida e a próxima chamada abre outra.
+  // Versão e stores NÃO mudam aqui (antipadrão 94): quem abre continua sendo o idbOpen de sempre.
+  let conexaoIdb = null;
+  function idbConexao(){
+    if (!conexaoIdb){
+      conexaoIdb = idbOpen().then(db => {
+        db.onversionchange = () => { try{ db.close(); }catch(e){} conexaoIdb = null; }; // não segura o banco de outra aba
+        db.onclose = () => { conexaoIdb = null; };
+        return db;
+      }, err => { conexaoIdb = null; throw err; });
+    }
+    return conexaoIdb;
+  }
+  // cria a transação e faz o pedido no MESMO passo, logo depois de ter a conexão (Safari antigo desativa a transação
+  // depois de um await); conexão fechada por fora: abre outra uma vez
+  async function comLoja(modo, usar){
+    for (let tentativa = 0; ; tentativa++){
+      const db = await idbConexao();
+      let tx;
+      try{ tx = db.transaction(STORE, modo); }
+      catch(e){ conexaoIdb = null; if (tentativa) throw e; continue; }
+      return usar(tx.objectStore(STORE), tx);
+    }
+  }
+  function idbPut(id, blob){
+    return comLoja("readwrite", (loja, tx) => new Promise((resolve,reject)=>{
+      loja.put(blob, id);
       // aparelho cheio costuma ABORTAR a transação (não dispara onerror): sem onabort a promessa nunca resolve e o lote fica parado calado
       tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error("gravação abortada (provável falta de espaço)"));
-    });
+    }));
   }
-  async function idbGet(id){
-    const db = await idbOpen();
-    return new Promise((resolve,reject)=>{
-      const tx = db.transaction(STORE,"readonly");
-      const req = tx.objectStore(STORE).get(id);
+  function idbGet(id){
+    return comLoja("readonly", (loja) => new Promise((resolve,reject)=>{
+      const req = loja.get(id);
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
-    });
+    }));
   }
-  async function idbDelete(id){
-    const db = await idbOpen();
-    return new Promise((resolve,reject)=>{
-      const tx = db.transaction(STORE,"readwrite");
-      tx.objectStore(STORE).delete(id);
+  function idbDelete(id){
+    return comLoja("readwrite", (loja, tx) => new Promise((resolve,reject)=>{
+      loja.delete(id);
       tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
-    });
+    }));
   }
-  async function idbTodasChaves(){
-    const db = await idbOpen();
-    return new Promise((resolve,reject)=>{
-      const tx = db.transaction(STORE,"readonly");
-      const q = tx.objectStore(STORE).getAllKeys();
+  function idbTodasChaves(){
+    return comLoja("readonly", (loja) => new Promise((resolve,reject)=>{
+      const q = loja.getAllKeys();
       q.onsuccess = () => resolve(q.result || []); q.onerror = () => reject(q.error);
-    });
+    }));
   }
 
+  // Reduz a foto antes de gravar. O celular com pouca memória (o Safari do iPhone é o caso típico) falha de três jeitos
+  // que antes travavam o lote para sempre ou deixavam arquivo órfão: getContext("2d") devolve null (passou do teto de
+  // memória de canvas), toBlob entrega null, ou o navegador simplesmente não responde. Agora tudo REJEITA com o motivo
+  // em e.tipo: "naoAbriu" (o navegador não lê o arquivo: culpa do ARQUIVO — o lote segue para o próximo), "memoria"
+  // (faltou memória) ou "prazo" (não ficou pronta em PRAZO_FOTO_MS) — culpa do MOMENTO do aparelho: o lote PARA e diz
+  // para fechar outros apps antes de escolher de novo (insistir costuma falhar de novo e esgotar a memória do resto).
+  // Nada é gravado antes de esta promessa resolver, então nenhuma falha daqui deixa arquivo órfão; resposta atrasada de
+  // um prazo vencido é ignorada. O canvas é zerado (width/height = 0) depois de usar: no Safari é isso que devolve a
+  // memória na hora, em vez de esperar o coletor.
+  let PRAZO_FOTO_MS = 60000;
+  function erroFoto(tipo, msg){ const e = new Error(msg); e.tipo = tipo; return e; }
   function compressImage(file, maxDim, quality){
     maxDim = maxDim || 1280; quality = quality || 0.72;
     return new Promise((resolve, reject)=>{
       const img = new Image();
       const url = URL.createObjectURL(file);
-      img.onload = () => {
-        let {width, height} = img;
-        if (width > height && width > maxDim){ height = Math.round(height*maxDim/width); width = maxDim; }
-        else if (height > maxDim){ width = Math.round(width*maxDim/height); height = maxDim; }
-        const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-        canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, "image/jpeg", quality);
+      let canvas = null, acabou = false, prazo = 0;
+      const limpar = ()=>{
+        img.onload = img.onerror = null;
+        try{ URL.revokeObjectURL(url); }catch(e){}
+        try{ img.removeAttribute("src"); }catch(e){}
+        if (canvas){ canvas.width = 0; canvas.height = 0; canvas = null; }
       };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("falha ao abrir imagem")); };
+      const fim = (erro, blob)=>{ if (acabou) return; acabou = true; clearTimeout(prazo); limpar(); if (erro) reject(erro); else resolve(blob); };
+      prazo = setTimeout(()=>fim(erroFoto("prazo", "a foto não ficou pronta em " + Math.round(PRAZO_FOTO_MS / 1000) + " s")), PRAZO_FOTO_MS);
+      img.onload = () => {
+        try{
+          let {width, height} = img;
+          if (!width || !height){ fim(erroFoto("naoAbriu", "imagem sem tamanho")); return; }
+          if (width > height && width > maxDim){ height = Math.round(height*maxDim/width); width = maxDim; }
+          else if (height > maxDim){ width = Math.round(width*maxDim/height); height = maxDim; }
+          canvas = document.createElement("canvas");
+          canvas.width = width; canvas.height = height;
+          const ctx2d = canvas.getContext("2d");
+          if (!ctx2d){ fim(erroFoto("memoria", "sem memória para preparar a foto (o navegador recusou o canvas)")); return; }
+          ctx2d.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(blob => {
+            if (!blob || !blob.size) fim(erroFoto("memoria", "sem memória para gerar a foto reduzida"));
+            else fim(null, blob);
+          }, "image/jpeg", quality);
+        }catch(e){ fim(erroFoto("memoria", "falha ao preparar a foto: " + ((e && e.message) || e))); }
+      };
+      img.onerror = () => fim(erroFoto("naoAbriu", "falha ao abrir imagem"));
       img.src = url;
     });
   }
@@ -1305,11 +1351,31 @@
   let filtroEtapa = "__todas__";
   // etapa é POR ANDAR (Felype 10/09: num prédio cada pavimento está numa etapa diferente) — vive na
   // árvore (andar.etapaAtual), então exporta/importa/sincroniza; não é preferência do aparelho.
-  function etapaParaNovaFoto(){
+  function etapaParaNovaFoto(){ return etapaParaNovaFotoEm(getEmp(empAtualId), getAndarAtual()); }
+  // a MESMA regra para qualquer andar (não só o que está na tela): foto que termina de gravar depois que a pessoa trocou
+  // de andar leva a etapa do andar ONDE ela entra
+  function etapaParaNovaFotoEm(emp, an){
     if (modo==="manutencao") return ETAPA_MANUTENCAO;
-    const lista = etapasDoEmp(getEmp(empAtualId));
-    const an = getAndarAtual();
+    const lista = etapasDoEmp(emp);
     return (an && an.etapaAtual && lista.includes(an.etapaAtual)) ? an.etapaAtual : lista[0];
+  }
+  // o ponto pelo id na árvore INTEIRA, não só no andar aberto: um lote continua entrando no ponto certo mesmo se a pessoa
+  // trocar de andar, de unidade ou de empreendimento no meio (antes ele parava dizendo "o ponto mudou")
+  function localizarPonto(ambienteId, paredeId){
+    for (const emp of estado.empreendimentos){
+      const conts = [].concat(emp.unidades || [], emp.areasComuns ? [emp.areasComuns] : [], emp.equipamentos ? [emp.equipamentos] : []);
+      for (const cont of conts) for (const an of (cont.andares || [])) for (const amb of (an.ambientes || [])){
+        if (amb.id !== ambienteId) continue;
+        const parede = (amb.paredes || []).find(p => p.id === paredeId);
+        if (parede) return { emp, cont, andar: an, amb, parede };
+      }
+    }
+    return null;
+  }
+  function nomeDoPonto(loc){
+    if (!loc) return "";
+    const nomeCont = loc.cont === loc.emp.areasComuns ? "Áreas comuns" : loc.cont === loc.emp.equipamentos ? "Equipamentos" : loc.cont.nome;
+    return [loc.emp.nome, nomeCont, loc.andar.nome, loc.amb.nome, loc.parede.nome].filter(Boolean).join(" · ");
   }
   function fotosVisiveis(p){
     if (filtroEtapa==="__todas__") return p.fotos;
@@ -2430,16 +2496,108 @@
   // ---------- Adicionar: uma ou várias de uma vez ----------
   // Várias de uma vez (galeria com várias marcadas; arrastar e soltar no computador): cada arquivo passa pelo MESMO
   // caminho de uma foto só (adicionarUmArquivo), em sequência, no mesmo ponto — o "pendente" vale para o lote inteiro.
-  // Lote só se diz concluído com TODOS dentro (antipadrão 89 da skill 21): se parar no meio (sem espaço, ponto que
-  // sumiu), o que já entrou fica, o que falhou é desfeito, e o aviso diz quantos entraram, quantos não e quais.
+  // Lote só se diz concluído com TODOS dentro (antipadrão 89 da skill 21): se parar no meio (sem espaço, sem memória,
+  // ponto apagado), o que já entrou fica, o que falhou é desfeito, e o aviso diz quantos entraram, quantos não e quais.
   // A câmera do app entrega um arquivo por vez ("capture" não tem várias) e segue no caminho de um só, igual à v7.7.
-  let timerLote = 0;
+  // Revisão confere-o-limite (02/10/2026): lote interrompido avisa na próxima abertura; falta de memória não trava nem
+  // deixa órfão; no LOTE, arquivo que já está no mesmo ponto é pulado; o ponto é procurado na árvore inteira (o lote
+  // continua se a pessoa trocar de andar); a tela é redesenhada uma vez, no fim do lote.
+  let timerLote = 0, LIMITE_VIDEO_GRANDE = 250e6;
   function mostrarProgressoLote(txt, someEmMs){
     const el = document.getElementById("progressoLote"); clearTimeout(timerLote);
     el.textContent = txt; el.style.display = "block";
     if (someEmMs) timerLote = setTimeout(()=>{ el.style.display = "none"; }, someEmMs);
   }
   function esconderProgressoLote(){ clearTimeout(timerLote); document.getElementById("progressoLote").style.display = "none"; }
+  // foto ou vídeo pelo tipo que o navegador informa; sem tipo (HEIC arrastado no Windows chega assim) ou com o tipo
+  // genérico "application/octet-stream", pela extensão
+  const EXT_FOTO = /\.(jpe?g|jfif|png|gif|webp|heic|heif|bmp|avif|tiff?)$/i, EXT_VIDEO = /\.(mp4|mov|m4v|3gp|webm|mkv|avi)$/i;
+  function tipoDeArquivo(f){
+    const t = String((f && f.type) || "");
+    if (t.startsWith("image/")) return "foto";
+    if (t.startsWith("video/")) return "video";
+    if (t && t !== "application/octet-stream") return "";
+    const n = String((f && f.name) || "");
+    return EXT_FOTO.test(n) ? "foto" : EXT_VIDEO.test(n) ? "video" : "";
+  }
+  // de onde veio o arquivo (galeria ou arrastar; a câmera fica fora): "nome|tamanho|data", gravado no registro da foto.
+  // O MESMO arquivo escolhido de novo é reconhecido por nome + tamanho — a data fica gravada mas não decide, porque no
+  // iPhone ela pode ser a hora da escolha em vez da data da foto (não confirmado em aparelho real) e aí nunca bateria.
+  function origemDoArquivo(f){ return String(f.name || "").slice(0, 120) + "|" + (f.size || 0) + "|" + (f.lastModified || 0); }
+  function chaveDeRepeticao(orig){ const m = /^(.*)\|(\d+)\|-?\d+$/.exec(String(orig || "")); return m && m[1] ? m[1] + "|" + m[2] : ""; }
+  function pontoTemArquivo(parede, chave){ return !!(chave && parede && parede.fotos.some(f => chaveDeRepeticao(f.orig) === chave)); }
+  function listaDeNomes(nomes){ const ns = nomes.map(n => "\"" + n + "\""); return ns.slice(0, 12).join(", ") + (ns.length > 12 ? " e mais " + (ns.length - 12) : ""); }
+
+  // ---------- Lote em andamento: não pode sumir calado ----------
+  // Recarregar a página no meio de um lote de 30 deixava 11 e nenhum aviso (revisor, 02/10/2026) — é o mesmo que o
+  // iPhone fechar a aba ao trocar de app, ou a pessoa tocar "Atualizar agora". Cada lote grava um registro PEQUENO e
+  // só dele (uma chave por lote: duas abas nunca se atropelam) com o total, o ponto e os arquivos que faltam, e o apaga
+  // ao terminar. Na próxima abertura, registro que sobrou vira aviso com a contagem e QUAIS faltaram. Enquanto o lote
+  // roda: batimento a cada 4 s (outra aba aberta não confunde lote vivo com lote parado), "beforeunload" segura a saída
+  // onde o navegador deixa (o Safari do iPhone não deixa — por isso o aviso na volta) e "Atualizar agora" espera o lote.
+  const LS_LOTE = "obraFotosLoteEmAndamento_", LOTE_PARADO_MS = 30000;
+  const andamentos = new Map(), aoTerminarLotes = [], lotesJaAvisados = new Set();
+  let batimentoLote = 0;
+  function gravarAndamento(a){ a.ts = Date.now(); try{ localStorage.setItem(LS_LOTE + a.id, JSON.stringify(a)); }catch(e){} } // cofre cheio: segue sem o registro (a árvore vem primeiro)
+  function segurarSaida(e){ e.preventDefault(); e.returnValue = ""; return ""; }
+  function iniciarAndamento(lista, alvo, origem){
+    const a = { id: gerarId("lote"), ts: 0, total: lista.length, ponto: nomeDoPonto(localizarPonto(alvo.ambienteId, alvo.paredeId)),
+      alvo: { ambienteId: alvo.ambienteId, paredeId: alvo.paredeId }, origem,
+      faltam: lista.map(f => chaveDeRepeticao(origemDoArquivo(f))), naoAbriu: [], recusados: [], repetidas: 0 };
+    andamentos.set(a.id, a); gravarAndamento(a);
+    if (andamentos.size === 1){
+      window.addEventListener("beforeunload", segurarSaida);
+      batimentoLote = setInterval(()=>{ for (const x of andamentos.values()) gravarAndamento(x); }, 4000);
+    }
+    return a;
+  }
+  // arquivo com destino final (entrou, pulado, não abriu, recusado): sai de "faltam"
+  function anotarNoAndamento(a, f, r){
+    const k = a.faltam.indexOf(chaveDeRepeticao(origemDoArquivo(f))); if (k >= 0) a.faltam.splice(k, 1);
+    if (!r.ok){ if (r.motivo === "naoAbriu") a.naoAbriu.push(f.name); else if (r.motivo === "recusado") a.recusados.push(f.name); else if (r.motivo === "repetida") a.repetidas++; }
+    gravarAndamento(a);
+  }
+  function encerrarAndamento(a){
+    andamentos.delete(a.id); try{ localStorage.removeItem(LS_LOTE + a.id); }catch(e){}
+    if (andamentos.size) return;
+    window.removeEventListener("beforeunload", segurarSaida); clearInterval(batimentoLote);
+    for (const f of aoTerminarLotes.splice(0)){ try{ f(); }catch(e){ console.error(e); } }
+  }
+  // página saindo no meio do lote (recarregar, fechar, navegar): marca, para a próxima abertura avisar na hora sem esperar
+  // o batimento envelhecer; página que só foi guardada no cache de voltar e voltou: desmarca
+  window.addEventListener("pagehide", ()=>{ for (const a of andamentos.values()){ a.interrompido = true; gravarAndamento(a); } });
+  window.addEventListener("pageshow", (e)=>{ if (e.persisted) for (const a of andamentos.values()){ delete a.interrompido; gravarAndamento(a); } });
+  async function avisarLotesInterrompidos(){
+    const parados = [], agora = Date.now(); let vivo = false, chaves = [];
+    try{ for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if (k && k.startsWith(LS_LOTE)) chaves.push(k); } }catch(e){ return; }
+    for (const k of chaves){
+      if (lotesJaAvisados.has(k)) continue;
+      let r = null; try{ r = JSON.parse(localStorage.getItem(k)); }catch(e){}
+      if (r && andamentos.has(r.id)) continue; // lote desta própria página, rodando agora
+      if (!r || r.interrompido || agora - (r.ts || 0) > LOTE_PARADO_MS) parados.push({ k, r }); else vivo = true;
+    }
+    if (vivo) setTimeout(avisarLotesInterrompidos, LOTE_PARADO_MS + 2000); // pode estar vivo noutra aba: confere quando o batimento envelhecer
+    const blocos = [];
+    for (const { k, r } of parados){
+      lotesJaAvisados.add(k);
+      if (!r || !Array.isArray(r.faltam)) continue;
+      const loc = r.alvo && localizarPonto(r.alvo.ambienteId, r.alvo.paredeId);
+      const faltam = r.faltam.filter(ch => !(loc && pontoTemArquivo(loc.parede, ch))); // gravou mas a página morreu antes de anotar: não falta
+      const naoAbriu = r.naoAbriu || [];
+      if (!faltam.length && !naoAbriu.length) continue; // terminou de fato: nada a dizer
+      const entraram = Math.max(0, r.total - faltam.length - naoAbriu.length - (r.recusados || []).length - (r.repetidas || 0));
+      let t = "Um lote de " + r.total + " fotos/vídeos para \"" + (r.ponto || "um ponto") + "\" parou no meio: o app foi fechado ou recarregado antes de terminar. Entraram " + entraram + ".";
+      if (faltam.length) t += " Ficaram de fora " + faltam.length + ": " + listaDeNomes(faltam.map(ch => ch.slice(0, ch.lastIndexOf("|")))) + ".";
+      if (naoAbriu.length) t += " Não consegui abrir: " + listaDeNomes(naoAbriu) + ".";
+      if (!loc) t += " Esse ponto não existe mais neste aparelho: escolha outro ponto para elas.";
+      else if (faltam.length) t += " Escolha de novo — pode marcar TODAS as do lote: as que já entraram neste ponto eu pulo.";
+      blocos.push(t);
+    }
+    if (blocos.length) await avisar(blocos.length === 1 ? "Fotos que não entraram" : "Lotes que pararam no meio", blocos.join("\n\n"));
+    for (const { k } of parados){ try{ localStorage.removeItem(k); }catch(e){} } // só depois do OK: se a página morrer de novo antes, avisa de novo
+  }
+  setTimeout(avisarLotesInterrompidos, 700);
+
   async function adicionarArquivos(arquivos, alvo, origem){
     if (!arquivos || !arquivos.length || !alvo) return;
     let lista = Array.from(arquivos);
@@ -2448,69 +2606,95 @@
       toast("Refazer troca uma foto só — usei a primeira das " + lista.length + " escolhidas");
       lista = lista.slice(0, 1);
     }
-    if (lista.length === 1) return adicionarUmArquivo(lista[0], alvo, { quem, origem }); // um só: o caminho da v7.7, intacto
+    if (lista.length === 1) return adicionarUmArquivo(lista[0], alvo, { quem, origem }); // um só: o caminho da v7.7
     // sem WebCodecs, a rota antiga de vídeo só pode começar AGORA, ainda dentro do toque (senão o celular bloqueia o
     // áudio) — vale para o PRIMEIRO vídeo do lote; os outros ficam com o original, como o vídeo que retoma ao reabrir
     let legado = null;
-    const iVideo = lista.findIndex(f => String(f.type || "").startsWith("video/"));
+    const iVideo = lista.findIndex(f => tipoDeArquivo(f) === "video");
     if (iVideo >= 0 && !VIDEO_RAPIDO_OK){
       const token = { cancelado: false };
       legado = { indice: iVideo, token, usado: false, promessa: comprimirVideo(lista[iVideo], (p)=>mostrarProgressoVideo(p, 0, true), token) };
     }
-    const total = lista.length;
-    let entraram = 0, videos = 0, filtroMudou = false, parouEm = -1, motivoParada = "";
-    const deFora = []; // os que ficaram de fora SEM parar o lote (foto que o navegador não abre, vídeo grande recusado)
-    for (let i = 0; i < total; i++){
-      mostrarProgressoLote("Adicionando " + (i + 1) + " de " + total + "…");
-      let r;
-      try{ r = await adicionarUmArquivo(lista[i], alvo, { quem, origem, lote: true, legado: (legado && legado.indice === i) ? legado : null }); }
-      catch(err){ console.error(err); r = { ok: false, parar: true, motivo: "erro" }; }
-      if (r.ok){ entraram++; if (r.video) videos++; if (r.filtroMudou) filtroMudou = true; continue; }
-      if (r.parar){ parouEm = i; motivoParada = r.motivo; break; }
-      deFora.push({ i, motivo: r.motivo });
+    const andamento = iniciarAndamento(lista, alvo, origem);
+    try{
+      const total = lista.length;
+      let entraram = 0, videos = 0, filtroMudou = false, parouEm = -1, motivoParada = "";
+      const deFora = []; // ficaram de fora SEM parar o lote: { i, motivo } — não abriu, vídeo grande recusado, repetida
+      for (let i = 0; i < total; i++){
+        mostrarProgressoLote("Adicionando " + (i + 1) + " de " + total + "…");
+        let r;
+        try{ r = await adicionarUmArquivo(lista[i], alvo, { quem, origem, lote: true, legado: (legado && legado.indice === i) ? legado : null }); }
+        catch(err){ console.error(err); r = { ok: false, parar: true, motivo: "erro" }; }
+        if (r.parar){ parouEm = i; motivoParada = r.motivo; break; }
+        anotarNoAndamento(andamento, lista[i], r);
+        if (r.ok){ entraram++; if (r.video) videos++; if (r.filtroMudou) filtroMudou = true; continue; }
+        deFora.push({ i, motivo: r.motivo });
+      }
+      if (legado && !legado.usado){ legado.token.cancelado = true; legado.promessa.then(()=>esconderProgressoVideo()); }
+      renderProgresso(); renderAmbientes(); // UMA vez, no fim (antes: o andar inteiro redesenhado a cada foto do lote)
+      if (entraram) avisarEspaco();
+      const naoAbriu = deFora.filter(d => d.motivo === "naoAbriu"), recusados = deFora.filter(d => d.motivo === "recusado"), repetidas = deFora.filter(d => d.motivo === "repetida");
+      const deveriamEntrar = total - recusados.length - repetidas.length; // vídeo que ela recusou e repetida pulada não "faltam"
+      const nomeDe = i => "\"" + (lista[i].name || ("arquivo " + (i + 1))) + "\"";
+      const listaDe = is => is.slice(0, 10).map(nomeDe).join(", ") + (is.length > 10 ? " e mais " + (is.length - 10) : "");
+      if (parouEm < 0 && !naoAbriu.length){
+        const extras = (videos ? " · " + videos + (videos === 1 ? " vídeo compactando" : " vídeos compactando") + " em segundo plano" : "")
+          + (repetidas.length ? " · " + repetidas.length + (repetidas.length === 1 ? " já estava" : " já estavam") + " neste ponto — pulei" : "")
+          + (recusados.length ? " · " + recusados.length + (recusados.length === 1 ? " vídeo grande que você deixou de fora" : " vídeos grandes que você deixou de fora") : "")
+          + (filtroMudou ? " · filtro voltou pra 'todas'" : "");
+        mostrarProgressoLote((entraram ? "✓ " + entraram + (entraram === 1 ? " adicionada" : " adicionadas") : "Nada novo") + extras, (repetidas.length || recusados.length) ? 6000 : 3500);
+        return;
+      }
+      // parcial: nunca em silêncio — quantos entraram, quantos não, por quê, o que fazer ANTES de escolher de novo, e QUAIS
+      esconderProgressoLote();
+      const linhas = ["Entraram " + entraram + " de " + deveriamEntrar + " neste ponto. Não entraram " + (deveriamEntrar - entraram) + "."];
+      let antesDeEscolher = "";
+      if (parouEm >= 0){
+        const porque = { gravar: "não consegui gravar o registro (o aviso anterior explica o porquê)", espaco: "o aparelho ficou sem espaço",
+          memoria: "o aparelho ficou sem memória para preparar a foto", prazo: "a foto demorou demais para ficar pronta (aparelho sem memória ou sobrecarregado)",
+          ponto: "o ponto de registro foi apagado no meio (por outra janela ou aparelho)" }[motivoParada] || "deu erro ao gravar";
+        const depois = total - parouEm - 1;
+        linhas.push("Parei no " + (parouEm + 1) + "º (" + nomeDe(parouEm) + "): " + porque + ". Nada dele ficou gravado" + (depois === 1 ? "; o seguinte não foi tentado." : depois ? "; os " + depois + " seguintes não foram tentados." : "."));
+        antesDeEscolher = (motivoParada === "gravar" || motivoParada === "espaco") ? "Primeiro libere espaço (apague vídeos ou registros antigos que não precisa); só depois escolha de novo"
+          : (motivoParada === "memoria" || motivoParada === "prazo") ? "Primeiro feche outros apps (ou reinicie o navegador); só depois escolha de novo"
+          : motivoParada === "ponto" ? "Escolha outro ponto para" : "Tente de novo";
+      }
+      if (naoAbriu.length) linhas.push("Não consegui abrir: " + listaDe(naoAbriu.map(d => d.i)) + " — formato que este navegador não lê (no computador, foto HEIC do iPhone é o caso comum): converta para JPG, ou adicione pelo celular.");
+      if (repetidas.length) linhas.push("Pulei " + repetidas.length + (repetidas.length === 1 ? " que já estava" : " que já estavam") + " neste ponto: " + listaDe(repetidas.map(d => d.i)) + ".");
+      if (recusados.length) linhas.push("Você deixou de fora (vídeo grande demais): " + listaDe(recusados.map(d => d.i)) + " — esse não conta como faltando.");
+      if (parouEm >= 0){
+        const faltaram = []; for (let i = parouEm; i < total; i++) faltaram.push(i);
+        linhas.push(antesDeEscolher + " os que faltaram: " + listaDe(faltaram) + "." + (motivoParada === "ponto" ? "" : origem === "arrastar" ? " Pode arrastar todos de novo: os que já entraram eu pulo." : " Pode marcar todas as do lote de novo: as que já entraram eu pulo."));
+      }
+      await avisar("Entraram " + entraram + " de " + deveriamEntrar, linhas.join("\n\n"));
+    } finally {
+      encerrarAndamento(andamento);
     }
-    if (legado && !legado.usado){ legado.token.cancelado = true; legado.promessa.then(()=>esconderProgressoVideo()); }
-    if (entraram === total){
-      mostrarProgressoLote("✓ " + total + " adicionadas" + (videos ? " · " + videos + (videos === 1 ? " vídeo compactando" : " vídeos compactando") + " em segundo plano" : "") + (filtroMudou ? " · filtro voltou pra 'todas'" : ""), 3500);
-      return;
-    }
-    // parcial: nunca em silêncio — quantos entraram, quantos não, por quê e QUAIS (para escolher de novo só esses)
-    esconderProgressoLote();
-    const nomeDe = i => "\"" + (lista[i].name || ("arquivo " + (i + 1))) + "\"";
-    const faltaram = deFora.map(d => d.i);
-    if (parouEm >= 0) for (let i = parouEm; i < total; i++) faltaram.push(i);
-    faltaram.sort((a, b) => a - b);
-    const linhas = ["Entraram " + entraram + " de " + total + " neste ponto. Não entraram " + (total - entraram) + "."];
-    if (parouEm >= 0){
-      const porque = motivoParada === "gravar" ? "não consegui gravar o registro (o aviso anterior explica o porquê)"
-        : motivoParada === "espaco" ? "o aparelho ficou sem espaço"
-        : motivoParada === "ponto" ? "o ponto de registro mudou no meio (troca de andar, ou outra janela mexeu nele)"
-        : "deu erro ao gravar";
-      const depois = total - parouEm - 1;
-      linhas.push("Parei no " + (parouEm + 1) + "º (" + nomeDe(parouEm) + "): " + porque + ". Nada dele ficou gravado" + (depois === 1 ? "; o seguinte não foi tentado." : depois ? "; os " + depois + " seguintes não foram tentados." : "."));
-    }
-    const naoAbriu = deFora.filter(d => d.motivo === "naoAbriu"), recusados = deFora.filter(d => d.motivo === "recusado");
-    if (naoAbriu.length) linhas.push("Não consegui abrir: " + naoAbriu.map(d => nomeDe(d.i)).join(", ") + " — formato que este navegador não lê (no computador, foto HEIC do iPhone é o caso comum).");
-    if (recusados.length) linhas.push("Você deixou de fora: " + recusados.map(d => nomeDe(d.i)).join(", ") + " (vídeo grande demais).");
-    linhas.push("Os que faltaram: " + faltaram.slice(0, 10).map(nomeDe).join(", ") + (faltaram.length > 10 ? " e mais " + (faltaram.length - 10) : "") + ". " + (origem === "arrastar" ? "Arraste de novo só esses." : "Escolha de novo só esses."));
-    await avisar("Entraram " + entraram + " de " + total, linhas.join("\n\n"));
   }
-  // UM arquivo, pelo caminho de sempre (o da v7.7, intacto para uma foto só): comprime (foto) ou guarda o original
-  // (vídeo) → grava o arquivo → mexe na árvore → grava a árvore → só então apaga o arquivo antigo (refazer). Se a árvore
-  // não gravar (sem espaço), desfaz e apaga o arquivo novo. ctx: { quem, origem: galeria|camera|arrastar, lote, legado }.
-  // No lote, os avisos de CADA arquivo ficam calados (quem chamou junta tudo num resumo só). Devolve { ok:true, video,
-  // filtroMudou } ou { ok:false, parar, motivo }: parar=true quando não adianta tentar os próximos (sem espaço, ponto
-  // sumiu, erro ao gravar); parar=false quando só este ficou de fora (foto que o navegador não abre, vídeo recusado).
+  // UM arquivo, pelo caminho de sempre: comprime (foto) ou guarda o original (vídeo) → grava o arquivo → mexe na árvore →
+  // grava a árvore → só então apaga o arquivo antigo (refazer). Se a árvore não gravar (sem espaço), desfaz e apaga o
+  // arquivo novo. ctx: { quem, origem: galeria|camera|arrastar, lote, legado }. No lote, os avisos de CADA arquivo ficam
+  // calados e a tela só é redesenhada no fim (quem chamou junta tudo num resumo só). Devolve { ok:true, video,
+  // filtroMudou } ou { ok:false, parar, motivo }: parar=true quando não adianta tentar os próximos (sem espaço, sem
+  // memória, ponto apagado, erro ao gravar); parar=false quando só este ficou de fora (não abre, recusado, repetido).
   async function adicionarUmArquivo(file, alvo, ctx){
     const quem = ctx.quem, lote = !!ctx.lote;
-    const ehVideo = file.type.startsWith("video/");
-    // a parede é re-resolvida por id depois de cada await: outra aba pode ter trocado a árvore no meio
-    const acharParede = ()=>{ const an = getAndarAtual(); const a = an && an.ambientes.find(a=>a.id===alvo.ambienteId); return (a && a.paredes.find(p=>p.id===alvo.paredeId)) || null; };
+    const ehVideo = tipoDeArquivo(file) === "video";
+    // o ponto é re-resolvido por id depois de cada await, na árvore INTEIRA: outra aba pode ter trocado a árvore no
+    // meio, e a pessoa pode ter trocado de andar (a foto entra no ponto escolhido, com a etapa do andar DELE)
+    const acharLocal = ()=>localizarPonto(alvo.ambienteId, alvo.paredeId);
+    const acharParede = ()=>{ const l = acharLocal(); return l ? l.parede : null; };
     // veio da câmera do app (não da galeria, onde o arquivo já mora no celular): cópia no aparelho ANTES de qualquer
     // recusa ou gravação — o que foi fotografado agora não existe em mais lugar nenhum
     const daCamera = ctx.origem === "camera";
     const copiou = (daCamera && copiaLigada()) ? guardarCopiaNoCelular(file, nomeDaCopia(alvo, file)) : false;
-    if (!acharParede()){ if (!lote) toast(copiou ? "Esse ambiente mudou — a foto foi mandada para o Download do celular; abre de novo e adiciona pela galeria" : "Esse ambiente mudou — abre de novo e tenta outra vez"); return { ok: false, parar: true, motivo: "ponto" }; }
+    // origem do arquivo no registro (galeria/arrastar); no LOTE, o mesmo arquivo já presente no ponto é pulado — escolher
+    // de novo depois de um lote interrompido não duplica (a câmera e a foto avulsa ficam fora, como na v7.7)
+    const orig = (ctx.origem === "galeria" || ctx.origem === "arrastar") ? origemDoArquivo(file) : null;
+    const chave = (lote && orig && !alvo.replaceId) ? chaveDeRepeticao(orig) : "";
+    const loc0 = acharLocal();
+    if (!loc0){ if (!lote) toast(copiou ? "Esse ambiente mudou — a foto foi mandada para o Download do celular; abre de novo e adiciona pela galeria" : "Esse ambiente mudou — abre de novo e tenta outra vez"); return { ok: false, parar: true, motivo: "ponto" }; }
+    if (chave && pontoTemArquivo(loc0.parede, chave)) return { ok: false, parar: false, motivo: "repetida" };
     // sem WebCodecs, a rota antiga (canvas) precisa começar AGORA, dentro do toque — senão o celular bloqueia o áudio.
     // No lote, quem chamou já a começou dentro do toque para o primeiro vídeo e a entrega em ctx.legado.
     // Se o fluxo abortar antes de agendar, o token cancela a rota antiga (senão ela rodaria até o fim com a faixa presa).
@@ -2518,11 +2702,11 @@
     const promessaLegada = ctx.legado ? ctx.legado.promessa : ((ehVideo && !VIDEO_RAPIDO_OK && !lote) ? comprimirVideo(file, (p)=>mostrarProgressoVideo(p, 0, true), tokenLegado) : null);
     let agendado = false;
     const abortarLegado = ()=>{ if (promessaLegada && !agendado){ tokenLegado.cancelado = true; promessaLegada.then(()=>esconderProgressoVideo()); } };
-    let abrindo = false; // true enquanto o navegador abre/reduz a foto: falhar AÍ é arquivo que ele não lê, não falta de espaço
+    let abrindo = false; // true enquanto o navegador abre/reduz a foto: falhar AÍ é arquivo que ele não lê ou falta de memória, não de espaço
     try{
       let blob;
       if (ehVideo){
-        if (file.size > 250e6){
+        if (file.size > LIMITE_VIDEO_GRANDE){
           const ok = await pedirConfirmacao("Vídeo muito grande", "Esse vídeo tem " + mb(file.size) + " — vai pesar no app e a compactação pode falhar." + (copiou ? " Uma cópia dele já foi mandada para a pasta Download do celular." : "") + " Salvar no app mesmo assim?", "Salvar mesmo assim");
           if (!ok){ abortarLegado(); if (copiou) toast("Vídeo não entrou no app — a cópia está na pasta Download do celular"); return { ok: false, parar: false, motivo: "recusado" }; }
         }
@@ -2536,24 +2720,28 @@
       if (alvo.replaceId){
         const novoId = novoIdFoto(quem);
         await idbPut(novoId, blob);
-        const parede = acharParede();
-        const foto = parede && parede.fotos.find(f=>f.id===alvo.replaceId);
+        const loc = acharLocal();
+        const foto = loc && loc.parede.fotos.find(f=>f.id===alvo.replaceId);
         if (!foto){ await idbDelete(novoId); toast("Esse registro não existe mais"); abortarLegado(); return { ok: false, parar: true, motivo: "registro" }; }
         antes = Object.assign({}, foto); fotoAlterada = foto; apagarDepois = alvo.replaceId;
         marcarRemovido(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
         foto.compactando = ehVideo; foto.tamanho = blob.size; delete foto.comprimido; foto.tentativas = 0;
-        if (!foto.etapa) foto.etapa = etapaParaNovaFoto(); // foto antiga sem etapa ganha a atual ao ser refeita
+        if (orig) foto.orig = orig; else delete foto.orig; // a foto agora é OUTRO arquivo
+        if (!foto.etapa) foto.etapa = etapaParaNovaFotoEm(loc.emp, loc.andar); // foto antiga sem etapa ganha a atual ao ser refeita
         idGravado = novoId;
         avisoFiltro = garantirVisivel(foto);
         msg = "Atualizado" + (ehVideo ? " · vídeo salvo, compactando em segundo plano" : "") + avisoFiltro;
       } else {
         const id = novoIdFoto(quem);
         await idbPut(id, blob);
-        const parede = acharParede();
-        if (!parede){ await idbDelete(id); if (!lote) toast("Esse ambiente mudou — abre de novo e tenta outra vez"); abortarLegado(); return { ok: false, parar: true, motivo: "ponto" }; }
-        const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFoto(), compactando: ehVideo, tamanho: blob.size };
-        parede.fotos.push(novaFoto);
+        const loc = acharLocal();
+        if (!loc){ await idbDelete(id); if (!lote) toast("Esse ambiente mudou — abre de novo e tenta outra vez"); abortarLegado(); return { ok: false, parar: true, motivo: "ponto" }; }
+        // outra aba (ou outro lote) pôs o mesmo arquivo neste ponto enquanto este gravava
+        if (chave && pontoTemArquivo(loc.parede, chave)){ await idbDelete(id); abortarLegado(); return { ok: false, parar: false, motivo: "repetida" }; }
+        const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFotoEm(loc.emp, loc.andar), compactando: ehVideo, tamanho: blob.size };
+        if (orig) novaFoto.orig = orig;
+        loc.parede.fotos.push(novaFoto);
         idGravado = id;
         avisoFiltro = garantirVisivel(novaFoto);
         msg = (ehVideo ? "Vídeo salvo · compactando em segundo plano" : "Foto adicionada") + " · " + novaFoto.etapa + avisoFiltro;
@@ -2567,25 +2755,33 @@
         else { const p = acharParede(); if (p) p.fotos = p.fotos.filter(f=>f.id!==idGravado); }
         await idbDelete(idGravado);
         if (copiou) avisar("A foto está fora do app", "Não coube no app, mas a foto foi mandada para a pasta Download do celular — confira lá. Libere espaço e adicione de novo pela galeria.");
-        abortarLegado(); renderAmbientes();
+        abortarLegado(); if (!lote) renderAmbientes();
         return { ok: false, parar: true, motivo: "gravar" };
       }
       if (apagarDepois) await idbDelete(apagarDepois);
-      if (!lote) toast(msg + (copiou ? " · cópia mandada para Download" : ""));
-      renderProgresso(); renderAmbientes();
-      avisarEspaco(); // o celular enche DURANTE o uso: reconfere depois de cada gravação, não só na abertura
+      if (!lote){
+        toast(msg + (copiou ? " · cópia mandada para Download" : ""));
+        renderProgresso(); renderAmbientes();
+        avisarEspaco(); // o celular enche DURANTE o uso: reconfere depois de cada gravação, não só na abertura
+      }
       if (ehVideo && idGravado){ agendado = true; if (ctx.legado) ctx.legado.usado = true; agendarCompactacao(idGravado, file, promessaLegada); }
       return { ok: true, video: ehVideo, filtroMudou: !!avisoFiltro };
     } catch(err){
       console.error(err);
       abortarLegado();
       const semEspaco = /quota|space|full/i.test(String(err && (err.name + " " + err.message)));
-      if (lote) return { ok: false, parar: !abrindo, motivo: abrindo ? "naoAbriu" : (semEspaco ? "espaco" : "erro") };
-      if (abrindo && ctx.origem === "arrastar"){
+      const falhaFoto = abrindo ? ((err && err.tipo) || "naoAbriu") : ""; // naoAbriu (culpa do arquivo) | memoria | prazo (culpa do aparelho)
+      if (lote) return { ok: false, parar: falhaFoto !== "naoAbriu", motivo: falhaFoto || (semEspaco ? "espaco" : "erro") };
+      if (falhaFoto === "memoria" || falhaFoto === "prazo"){
+        await avisar("Faltou memória", "O aparelho ficou sem memória para preparar \"" + file.name + "\"" + (falhaFoto === "prazo" ? " (demorou demais)" : "") + ". Nada foi gravado. Feche outros apps (ou reinicie o navegador) e tente de novo"
+          + (copiou ? " — a foto foi mandada para a pasta Download do celular." : daCamera ? " — tire a foto de novo." : ctx.origem === "arrastar" ? "; o arquivo continua no computador." : "; a foto continua na galeria do celular."));
+        return { ok: false, parar: true, motivo: falhaFoto };
+      }
+      if (falhaFoto && ctx.origem === "arrastar"){
         await avisar("Não consegui abrir", "O navegador não consegue abrir \"" + file.name + "\" — formato que ele não lê (no computador, foto HEIC do iPhone é o caso comum). Nada foi gravado. Converta para JPG, ou adicione pelo celular.");
         return { ok: false, parar: false, motivo: "naoAbriu" };
       }
-      if (abrindo){ // arquivo que o navegador não decodifica não é falta de espaço: mandar "libere espaço" faz a pessoa apagar coisa à toa
+      if (falhaFoto){ // arquivo que o navegador não decodifica não é falta de espaço: mandar "libere espaço" faz a pessoa apagar coisa à toa
         await avisar("Não consegui abrir", "O app não consegue abrir \"" + file.name + "\" — formato que o navegador não lê ou arquivo danificado. Nada foi gravado" + (daCamera ? "; tira a foto de novo." : "; a foto continua na galeria do celular."));
         return { ok: false, parar: false, motivo: "naoAbriu" };
       }
@@ -2603,7 +2799,7 @@
   // arquivo na aba, por cima do app. Só age em arrasto de ARQUIVO (texto arrastado para um campo segue como antes).
   function arrastoDeArquivo(e){ const dt = e.dataTransfer; return !!(dt && dt.types && Array.prototype.indexOf.call(dt.types, "Files") >= 0); }
   function zonaDeSoltar(e){ const t = e.target && (e.target.nodeType === 1 ? e.target : e.target.parentElement); return (t && t.closest) ? t.closest("[data-add]") : null; }
-  function ehFotoOuVideo(f){ const t = String((f && f.type) || ""); return t.startsWith("image/") || t.startsWith("video/"); }
+  function ehFotoOuVideo(f){ return !!tipoDeArquivo(f); }
   const listaParaSoltar = document.getElementById("listaAmbientes");
   for (const tipo of ["dragenter", "dragover"]) listaParaSoltar.addEventListener(tipo, (e)=>{
     const z = zonaDeSoltar(e); if (!z || !arrastoDeArquivo(e)) return;
@@ -2614,12 +2810,21 @@
     const z = zonaDeSoltar(e); if (!z || !arrastoDeArquivo(e)) return;
     e.preventDefault(); z.classList.remove("alvo-soltar");
     const [ambId, paredeId] = z.getAttribute("data-add").split("|");
-    const todos = Array.from(e.dataTransfer.files || []);
-    const midia = todos.filter(ehFotoOuVideo), ignorados = todos.filter(f => !ehFotoOuVideo(f));
-    if (ignorados.length){
-      const nomes = ignorados.slice(0, 8).map(f => "\"" + f.name + "\"").join(", ") + (ignorados.length > 8 ? " e mais " + (ignorados.length - 8) : "");
-      avisar(midia.length ? "Alguns arquivos ficaram de fora" : "Nada foi adicionado", "Só entram fotos e vídeos. Ignorei " + (ignorados.length === 1 ? "1 arquivo que não é foto nem vídeo: " : ignorados.length + " arquivos que não são foto nem vídeo: ") + nomes + "." + (midia.length ? (midia.length === 1 ? " A foto/vídeo que veio junto está entrando." : " As " + midia.length + " fotos/vídeos que vieram junto estão entrando.") : ""));
-    }
+    // tudo lido AGORA (o conteúdo do arrasto só existe durante este evento). Pasta não entra: o navegador a entrega
+    // como "arquivo" sem tipo, e quem diz que é pasta é o webkitGetAsEntry
+    const midia = [], ignorados = [], pastas = [];
+    const itens = Array.from(e.dataTransfer.items || []).filter(it => it.kind === "file");
+    if (itens.length){
+      for (const it of itens){
+        let pasta = false; try{ const en = it.webkitGetAsEntry && it.webkitGetAsEntry(); pasta = !!(en && en.isDirectory); }catch(x){}
+        const f = it.getAsFile();
+        if (pasta) pastas.push((f && f.name) || "pasta"); else if (f && ehFotoOuVideo(f)) midia.push(f); else if (f) ignorados.push(f);
+      }
+    } else for (const f of Array.from(e.dataTransfer.files || [])){ if (ehFotoOuVideo(f)) midia.push(f); else ignorados.push(f); }
+    const avisos = [];
+    if (pastas.length) avisos.push("Pasta não entra: abra a pasta e arraste as fotos de DENTRO dela. Ignorei " + (pastas.length === 1 ? "a pasta " : pastas.length + " pastas: ") + listaDeNomes(pastas) + ".");
+    if (ignorados.length) avisos.push("Só entram fotos e vídeos. Ignorei " + (ignorados.length === 1 ? "1 arquivo que não é foto nem vídeo: " : ignorados.length + " arquivos que não são foto nem vídeo: ") + listaDeNomes(ignorados.map(f => f.name)) + ".");
+    if (avisos.length) avisar(midia.length ? "Alguns arquivos ficaram de fora" : "Nada foi adicionado", avisos.join("\n\n") + (midia.length ? (midia.length === 1 ? "\n\nA foto/vídeo que veio junto está entrando." : "\n\nAs " + midia.length + " fotos/vídeos que vieram junto estão entrando.") : ""));
     if (!midia.length) return;
     await adicionarArquivos(midia, { ambienteId: ambId, paredeId, replaceId: null }, "arrastar");
   });
@@ -2953,13 +3158,28 @@
     // o ?v= do "Atualizar agora" já cumpriu o papel: sai da URL, senão toda recarga manual repete a mesma URL (e o cache dela)
     try{ if (/[?&]v=/.test(location.search)) history.replaceState(null, "", location.pathname); }catch(e){}
     document.getElementById("btnFecharAviso").addEventListener("click", ()=>{ document.getElementById("avisoVersao").style.display = "none"; });
-    document.getElementById("btnRecarregar").addEventListener("click", ()=>{ try{ localStorage.setItem("obraFotosAtualizacaoTentada", String(Date.now())); }catch(e){} location.href = location.pathname + "?v=" + Date.now(); });
+    function recarregarVersaoNova(){ try{ localStorage.setItem("obraFotosAtualizacaoTentada", String(Date.now())); }catch(e){} location.href = location.pathname + "?v=" + Date.now(); }
+    let atualizarAoTerminar = false;
+    document.getElementById("btnRecarregar").addEventListener("click", async ()=>{
+      // lote de fotos entrando: atualizar agora cortaria o lote no meio (as que faltam não entrariam) — espera ele acabar
+      if (andamentos.size){
+        const faltam = [...andamentos.values()].reduce((s, a) => s + a.faltam.length, 0);
+        const ok = await pedirConfirmacao("Fotos ainda entrando", "Ainda estou adicionando fotos (faltam " + faltam + "). Se atualizar agora, as que faltam não entram. Toque em \"Atualizar quando terminar\": o app atualiza sozinho assim que o lote acabar.", "Atualizar quando terminar");
+        if (!ok) return;
+        if (andamentos.size){
+          if (!atualizarAoTerminar){ atualizarAoTerminar = true; aoTerminarLotes.push(()=>setTimeout(recarregarVersaoNova, 1500)); } // 1,5 s: dá para ver o resumo do lote
+          toast("Vou atualizar assim que as fotos terminarem de entrar"); return;
+        }
+      }
+      recarregarVersaoNova();
+    });
     checarVersao();
     document.addEventListener("visibilitychange", ()=>{ if (!document.hidden) checarVersao(); });
     setInterval(checarVersao, 30*60*1000);
   })();
   // gancho de teste (só no servidor local de desenvolvimento; não existe na versão publicada)
-  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__obraDebug = { setPendente:(p)=>{ pendente = p; }, comprimirVideoRapido, comprimirVideo, idbGet, idbTodasChaves, estado:()=>estado, acharFotoPorId, salvarEstado, fundirEstados, varrerOrfaos, LS_KEY, VIDEO_RAPIDO_OK };
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__obraDebug = { setPendente:(p)=>{ pendente = p; }, comprimirVideoRapido, comprimirVideo, idbGet, idbTodasChaves, estado:()=>estado, acharFotoPorId, salvarEstado, fundirEstados, varrerOrfaos, LS_KEY, VIDEO_RAPIDO_OK,
+    setPrazoFoto:(ms)=>{ PRAZO_FOTO_MS = ms; }, setLimiteVideoGrande:(b)=>{ LIMITE_VIDEO_GRANDE = b; }, lotesEmAndamento:()=>andamentos.size, LS_LOTE };
 })();
 </script>
 </body>

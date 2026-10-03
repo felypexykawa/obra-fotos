@@ -42,6 +42,17 @@ const CAPACIDADES = {
   'addEventListener("drop"': 'arrastar e soltar no "+ Foto/Vídeo" de um ponto',
   '["dragenter", "dragover"]) window.addEventListener(': 'soltar fora de um ponto não abre o arquivo por cima do app (dragenter E dragover)',
   'id="capAvisoIphone"': 'aviso de câmera no iPhone (Ajustes → Safari → Câmera)',
+  // v7.8, correções do revisor confere-o-limite (02/10/2026)
+  'avisarLotesInterrompidos': 'lote interrompido (página recarregada/fechada) avisa na próxima abertura, com quais faltaram',
+  '"beforeunload", segurarSaida': 'segura a saída da página enquanto um lote roda',
+  'Atualizar quando terminar': '"Atualizar agora" espera o lote acabar',
+  'erroFoto("memoria"': 'falta de memória ao preparar a foto para o lote com aviso (não trava, não deixa órfão)',
+  'PRAZO_FOTO_MS': 'prazo máximo por foto',
+  'canvas.width = 0': 'canvas zerado depois de usar (devolve a memória no Safari)',
+  'pontoTemArquivo': 'arquivo já presente no mesmo ponto é pulado no lote',
+  'localizarPonto': 'ponto procurado na árvore inteira (lote continua se trocar de andar)',
+  'idbConexao': 'uma conexão do IndexedDB reaproveitada',
+  'webkitGetAsEntry': 'pasta arrastada é ignorada com aviso próprio',
 };
 for (const [k, v] of Object.entries(CAPACIDADES)) if (!s.includes(k)) falha('capacidade ausente: ' + k + ' (' + v + ')');
 
