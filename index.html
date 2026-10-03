@@ -727,6 +727,9 @@
   // falso "sem memória" (revisor, 02/10/2026 — Chrome 5 de 5, motor do Safari 3 de 3). O vigia confere a cada
   // PASSO_PRAZO_MS: passo com a página escondida não soma nada, e o salto de relógio de uma página parada soma no
   // máximo 2 passos. Foto que nunca fica pronta com a tela à vista continua parando o lote em PRAZO_FOTO_MS.
+  // Segundo teto, que não olha "escondida": 3x o prazo de página RODANDO (mesmo limite de 2 passos por salto). Um
+  // navegador embutido que diga "escondida" com a tela à vista prenderia o lote para sempre, como na v7.7 (revisor,
+  // 03/10/2026) — com o teto, para em 3 min; e o celular que congela o app não roda o vigia, então não soma.
   let PRAZO_FOTO_MS = 60000;
   const PASSO_PRAZO_MS = 1000;
   function erroFoto(tipo, msg){ const e = new Error(msg); e.tipo = tipo; return e; }
@@ -735,7 +738,7 @@
     return new Promise((resolve, reject)=>{
       const img = new Image();
       const url = URL.createObjectURL(file);
-      let canvas = null, acabou = false, vigia = 0, aVista = 0, ultimoPasso = performance.now();
+      let canvas = null, acabou = false, vigia = 0, aVista = 0, rodando = 0, ultimoPasso = performance.now();
       const limpar = ()=>{
         img.onload = img.onerror = null;
         try{ URL.revokeObjectURL(url); }catch(e){}
@@ -744,10 +747,11 @@
       };
       const fim = (erro, blob)=>{ if (acabou) return; acabou = true; clearInterval(vigia); limpar(); if (erro) reject(erro); else resolve(blob); };
       vigia = setInterval(()=>{
-        const agora = performance.now(), passo = agora - ultimoPasso; ultimoPasso = agora;
-        if (document.hidden) return;
-        aVista += Math.min(Math.max(0, passo), 2 * PASSO_PRAZO_MS);
-        if (aVista >= PRAZO_FOTO_MS) fim(erroFoto("prazo", "a foto não ficou pronta em " + Math.round(PRAZO_FOTO_MS / 1000) + " s de tela à vista"));
+        const agora = performance.now(), passo = Math.min(Math.max(0, agora - ultimoPasso), 2 * PASSO_PRAZO_MS); ultimoPasso = agora;
+        rodando += passo;
+        if (!document.hidden) aVista += passo;
+        if (aVista >= PRAZO_FOTO_MS || rodando >= 3 * PRAZO_FOTO_MS)
+          fim(erroFoto("prazo", "a foto não ficou pronta em " + Math.round(PRAZO_FOTO_MS / 1000) + " s de tela à vista (ou " + Math.round(3 * PRAZO_FOTO_MS / 1000) + " s rodando)"));
       }, PASSO_PRAZO_MS);
       img.onload = () => {
         try{
@@ -2539,7 +2543,7 @@
   function origemDoArquivo(f){ return String(f.name || "").slice(0, 120) + "|" + (f.size || 0); }
   function chaveDeRepeticao(orig){ const m = /^(.*)\|(\d+)$/.exec(String(orig || "")); return m && m[1] ? m[1] + "|" + m[2] : ""; }
   function pontoTemArquivo(parede, chave){ return !!(chave && parede && parede.fotos.some(f => chaveDeRepeticao(f.orig) === chave)); }
-  function listaDeNomes(nomes){ const ns = nomes.map(n => "\"" + n + "\""); return ns.slice(0, 12).join(", ") + (ns.length > 12 ? " e mais " + (ns.length - 12) : ""); }
+  function listaDeNomes(nomes){ const ns = nomes.map(n => n ? "\"" + n + "\"" : "(arquivo sem nome)"); return ns.slice(0, 12).join(", ") + (ns.length > 12 ? " e mais " + (ns.length - 12) : ""); }
 
   // ---------- Lote em andamento: não pode sumir calado ----------
   // Recarregar a página no meio de um lote de 30 deixava 11 e nenhum aviso (revisor, 02/10/2026) — é o mesmo que o
@@ -2617,8 +2621,11 @@
       if (!faltam.length && !naoAbriu.length) continue; // terminou de fato: nada a dizer
       const entraram = Math.max(0, r.total - faltam.length - naoAbriu.length - (r.recusados || []).length - (r.repetidas || 0));
       const parou = (r.parou && r.parou.motivo) || "";
-      let t = "Um lote de " + r.total + " fotos/vídeos para \"" + (r.ponto || "um ponto") + "\" parou no meio: "
-        + (parou ? porqueParou(parou, true) + (r.parou.nome ? " (em \"" + r.parou.nome + "\")" : "") : "o app foi fechado ou recarregado antes de terminar") + ". Entraram " + entraram + ".";
+      // ponto apagado no meio e que voltou depois (desfazer, outra janela): dizer só "foi apagado" contradiz o "escolha de novo" logo abaixo
+      const motivoTexto = !parou ? "o app foi fechado ou recarregado antes de terminar"
+        : (parou === "ponto" && loc) ? "o ponto de registro sumiu no meio do lote (agora ele está de volta)"
+        : porqueParou(parou, true) + (r.parou.nome ? " (em \"" + r.parou.nome + "\")" : "");
+      let t = "Um lote de " + r.total + " fotos/vídeos para \"" + (r.ponto || "um ponto") + "\" parou no meio: " + motivoTexto + ". Entraram " + entraram + ".";
       if (faltam.length) t += " Ficaram de fora " + faltam.length + ": " + listaDeNomes(faltam.map(ch => ch.slice(0, ch.lastIndexOf("|")))) + ".";
       if (naoAbriu.length) t += " Não consegui abrir: " + listaDeNomes(naoAbriu) + ".";
       if (!loc) t += " Esse ponto não existe mais neste aparelho: escolha outro ponto para elas.";
