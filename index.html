@@ -106,6 +106,33 @@
   .resumo-predio{font-size:12px;margin:10px 0 0;padding:8px 10px;border-radius:8px;background:#f3f1ec;color:#444;line-height:1.5;}
   .resumo-predio.erro{background:#fdece9;color:var(--accent-dark);}
   .resumo-predio:empty{display:none;}
+  /* câmera do app (v7.9): tela cheia, abaixo dos modais (70) para os avisos aparecerem por cima; as faixas de cima
+     (compactação, lote, versão nova) somem enquanto ela está aberta — cobririam a barra de tempo */
+  .grav-tela{position:fixed;inset:0;background:#000;color:#fff;z-index:60;display:none;flex-direction:column;}
+  .grav-tela.aberta{display:flex;}
+  body.gravando{overflow:hidden;}
+  body.gravando #progressoVideo, body.gravando #progressoLote, body.gravando #avisoVersao{display:none !important;}
+  .grav-previa{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;}
+  .grav-topo{position:relative;z-index:1;padding:max(10px,env(safe-area-inset-top)) 14px 10px;background:linear-gradient(rgba(0,0,0,.8),rgba(0,0,0,.5));}
+  .grav-l1{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .grav-estado{font-size:12px;font-weight:700;letter-spacing:.05em;min-width:84px;}
+  .grav-estado.rec{color:#ff6b5e;}
+  .grav-tempo{font-size:34px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;}
+  .grav-parte{font-size:12px;opacity:.9;min-width:84px;text-align:right;}
+  .grav-barra{height:12px;border-radius:6px;background:rgba(255,255,255,.28);margin:8px 0 6px;overflow:hidden;}
+  .grav-barra > div{height:100%;width:0;background:#4cc38a;transition:width .25s linear;}
+  .grav-barra.espaco > div{background:#f1c40f;}
+  .grav-barra.acaba > div{background:#ff6b5e;}
+  .grav-l2{font-size:14px;font-weight:600;line-height:1.35;}
+  .grav-l3{font-size:11px;line-height:1.35;opacity:.85;margin-top:2px;}
+  .grav-msg{position:relative;z-index:1;display:none;margin:12px 14px 0;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.72);font-size:13px;line-height:1.45;white-space:pre-line;}
+  .grav-baixo{position:relative;z-index:1;margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 14px max(18px,env(safe-area-inset-bottom));background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.7));}
+  .grav-lado{flex:1;min-width:0;}
+  .grav-lado button{max-width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.45);color:#fff;font-size:13px;font-family:inherit;}
+  .grav-lado.dir{text-align:right;}
+  .grav-botao{flex:none;width:78px;height:78px;border-radius:50%;border:5px solid #fff;background:#d93025;padding:0;transition:border-radius .15s;}
+  .grav-botao.gravando{border-radius:22px;}
+  .grav-botao:disabled{opacity:.4;}
 </style>
 </head>
 <body>
@@ -183,11 +210,32 @@
   <div class="modal">
     <h3>Registrar</h3>
     <button type="button" class="cap-opcao" id="capFoto" title="Abre a câmera direto pra tirar a foto agora — não passa pela galeria">📷 Tirar foto agora</button>
-    <button type="button" class="cap-opcao" id="capVideo" title="Abre a câmera direto pra gravar um vídeo agora — não passa pela galeria">🎥 Gravar vídeo agora</button>
+    <button type="button" class="cap-opcao" id="capVideo" title="Abre a tela de gravação do app, com barra de tempo: grava em partes de 5 minutos (a próxima começa sozinha) e mostra quanto ainda cabe no celular — não passa pela galeria">🎥 Gravar vídeo agora</button>
     <button type="button" class="cap-opcao" id="capGaleria" title="Escolhe fotos ou vídeos que já estão salvos no aparelho — dá para marcar VÁRIOS de uma vez, e todos entram neste ponto">🖼️ Escolher da galeria (uma ou várias)</button>
     <p id="capAvisoIphone" hidden style="font-size:12px;line-height:1.4;color:#5a4a20;background:#fff8ec;border:1px solid #eadfc0;border-radius:8px;padding:8px 10px;margin:6px 0 0;">No iPhone, se 'Tirar foto agora' não abrir a câmera: Ajustes → Safari → Câmera → Permitir, e abra o app pelo Safari (não por dentro do WhatsApp). Enquanto isso, use 'Escolher da galeria'.</p>
     <p id="capNota" style="font-size:12px;color:#666;margin:6px 2px 0;"></p>
     <div class="modal-acoes"><button type="button" class="cancelar" id="capCancelar">Cancelar</button></div>
+  </div>
+</div>
+
+<!-- Câmera do app: gravar vídeo com barra de tempo (v7.9) -->
+<div class="grav-tela" id="telaGravacao" role="dialog" aria-modal="true" aria-label="Gravar vídeo">
+  <video class="grav-previa" id="gravPrevia" playsinline muted autoplay></video>
+  <div class="grav-topo">
+    <div class="grav-l1">
+      <span class="grav-estado" id="gravEstado">ABRINDO…</span>
+      <span class="grav-tempo" id="gravTempo">00:00</span>
+      <span class="grav-parte" id="gravParte"></span>
+    </div>
+    <div class="grav-barra" id="gravBarra" role="progressbar" aria-label="Tempo da parte" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="gravBarraPreench"></div></div>
+    <div class="grav-l2" id="gravFalta"></div>
+    <div class="grav-l3" id="gravEspaco"></div>
+  </div>
+  <div class="grav-msg" id="gravMsg" role="status" aria-live="polite"></div>
+  <div class="grav-baixo">
+    <div class="grav-lado"><button type="button" id="gravCancelar" title="Fecha esta tela sem gravar nada">Cancelar</button></div>
+    <button type="button" class="grav-botao" id="gravBotao" aria-label="Começar a gravar" disabled></button>
+    <div class="grav-lado dir"><button type="button" id="gravNativa" title="Abre a câmera normal do celular, no lugar desta tela" hidden>Usar a câmera do celular</button></div>
   </div>
 </div>
 
@@ -1077,13 +1125,15 @@
   // pelo compactado quando termina (ou tira a marca e deixa o original, se não der). Sobrevive a fechar o app:
   // ao abrir de novo, o que ficou marcado volta pra fila.
   const filaCompact = []; let compactandoAgora = false;
+  let grav = null; // tela de gravação do app aberta (v7.9, mais abaixo): enquanto existe, a fila de compactação espera
   function acharFotoPorId(id){ for (const p of todasParedes()){ const f = p.fotos.find(x=>x.id===id); if (f) return f; } return null; }
   function agendarCompactacao(fotoId, arquivo, promessaLegada){ filaCompact.push({fotoId, arquivo, promessaLegada}); processarFilaCompact(); }
   async function processarFilaCompact(){
     if (compactandoAgora) return; compactandoAgora = true;
     let trava = null; // segura a tela acesa só enquanto a fila roda (segundos); solta no fim
     try{ if (navigator.wakeLock && navigator.wakeLock.request) trava = await navigator.wakeLock.request("screen"); }catch(e){ trava = null; }
-    try{ while (filaCompact.length){ const job = filaCompact.shift(); try{ await compactarUm(job); }catch(e){ console.error(e); } } }
+    // com a tela de gravação aberta a fila espera: o codificador do celular é um só, e compactar ao mesmo tempo estraga a gravação
+    try{ while (filaCompact.length){ while (grav) await new Promise(r => setTimeout(r, 1000)); const job = filaCompact.shift(); try{ await compactarUm(job); }catch(e){ console.error(e); } } }
     finally{ compactandoAgora = false; esconderProgressoVideo(); try{ if (trava) trava.release().catch(()=>{}); }catch(e){} }
   }
   async function compactarUm(job){
@@ -2453,7 +2503,7 @@
     const d = new Date(), pad = x => String(x).padStart(2, "0");
     const quando = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
     const ext = (file.name && /\.[A-Za-z0-9]{2,4}$/.test(file.name)) ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : (file.type.startsWith("video/") ? ".mp4" : ".jpg");
-    return ["FotosObra", limparNome(emp && emp.nome), limparNome(contNome), limparNome(andar && andar.nome), limparNome(amb && amb.nome), limparNome(par && par.nome), quando].join("_") + ext;
+    return ["FotosObra", limparNome(emp && emp.nome), limparNome(contNome), limparNome(andar && andar.nome), limparNome(amb && amb.nome), limparNome(par && par.nome), quando].join("_") + (file.parteN ? "_parte" + file.parteN : "") + ext;
   }
   function guardarCopiaNoCelular(file, nome){
     try{
@@ -2495,10 +2545,304 @@
   function ehIOS(){ const ua = navigator.userAgent || ""; return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1); }
   document.getElementById("capAvisoIphone").hidden = !ehIOS();
   document.getElementById("capFoto").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputFotoCam").click(); });
-  document.getElementById("capVideo").addEventListener("click", ()=>{ fecharCaptura(); document.getElementById("inputVideoCam").click(); });
+  // "Gravar vídeo agora": a tela de gravação do app (câmera com barra de tempo). Sem ela (navegador sem câmera pelo app,
+  // sem https), cai direto na câmera do celular — o caminho de sempre.
+  document.getElementById("capVideo").addEventListener("click", ()=>{
+    fecharCaptura();
+    if (!gravDisponivel() || !pendente){ document.getElementById("inputVideoCam").click(); return; }
+    gravAbrir(pendente);
+  });
   document.getElementById("capGaleria").addEventListener("click", ()=>{ const inp = document.getElementById("inputFoto"); inp.multiple = galeriaVarias(); fecharCaptura(); inp.click(); });
   document.getElementById("capCancelar").addEventListener("click", ()=>{ fecharCaptura(); pendente = null; });
   for (const id of ["inputFoto","inputFotoCam","inputVideoCam"]) document.getElementById(id).addEventListener("change", aoEscolherArquivo);
+  // ---------- Câmera do app: gravar vídeo com barra de tempo (v7.9) ----------
+  // "Gravar vídeo agora" abre uma tela de gravação do PRÓPRIO app (a câmera do celular não deixa o app desenhar nada
+  // por cima). No alto, uma barra mostra o tempo gravado e quanto ainda cabe, pelo que acabar primeiro: os 5 minutos
+  // da parte ou o espaço do celular. Aos 5 minutos a parte fecha e a próxima começa sozinha: o gravador novo liga ANTES
+  // de o velho parar, para não perder nenhum quadro entre as duas (se o celular não deixar dois gravadores juntos, há
+  // um corte pequeno e a gravação segue). Já grava no tamanho final (~1,4 Mbps, o mesmo da compactação): a parte entra
+  // com a marca "comprimido" e não passa pela fila de compactação. Cada parte vira um vídeo no ponto e, com a "Cópia no
+  // celular" ligada, vai também para o Download. A parte em andamento fica na memória (no máx. 5 min ≈ 55 MB): é isso
+  // que se perde se o celular matar o app no meio — por isso as partes são curtas. Sem câmera pelo app, sem permissão
+  // ou com erro: o botão "Usar a câmera do celular" abre o caminho de sempre.
+  let PARTE_MS = 5 * 60 * 1000, RESERVA_ESPACO = 150e6;
+  const GRAV_VIDEO_BPS = 1400000, GRAV_AUDIO_BPS = 64000, GRAV_BYTES_S = (GRAV_VIDEO_BPS + GRAV_AUDIO_BPS) / 8;
+  const gravEl = (id) => document.getElementById(id);
+  function gravDisponivel(){ return !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); }
+  // mp4 primeiro (toca em qualquer celular e no WhatsApp); webm só onde o navegador não grava mp4 (VP8 antes de VP9: pesa menos em celular fraco)
+  function gravFormato(){
+    const tipos = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp8,opus", "video/webm;codecs=vp9,opus", "video/webm"];
+    try{ return tipos.find(t => MediaRecorder.isTypeSupported(t)) || ""; }catch(e){ return ""; }
+  }
+  function gravDuracao(s){ s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60, p = n => String(n).padStart(2, "0"); return (h ? h + ":" + p(m) : p(m)) + ":" + p(x); }
+  function gravCabe(s){ return s < 60 ? "menos de 1 min" : s < 7200 ? Math.floor(s / 60) + " min" : Math.floor(s / 3600) + " h"; }
+  // o que ainda cabe NESTA parte: o que acabar primeiro entre o fim da parte e o espaço do celular. folgaBytes null = espaço
+  // desconhecido (só vale a parte). fracao = quanto da barra está cheio (a barra "acaba" onde o limite estiver).
+  function gravCalcularBarra(decorridoS, parteS, folgaBytes, bytesPorS, reserva){
+    const faltaParte = Math.max(0, parteS - decorridoS);
+    const faltaEspaco = folgaBytes == null ? Infinity : Math.max(0, folgaBytes - reserva) / Math.max(1, bytesPorS);
+    const porEspaco = faltaEspaco < faltaParte, falta = Math.min(faltaParte, faltaEspaco), total = decorridoS + falta;
+    return { falta, porEspaco, fracao: total > 0 ? Math.min(1, decorridoS / total) : 0 };
+  }
+  function gravSegurarSaida(e){ e.preventDefault(); e.returnValue = ""; return ""; }
+  function gravMensagem(txt){ const el = gravEl("gravMsg"); el.textContent = txt || ""; el.style.display = txt ? "block" : "none"; }
+  function gravAviso(g, txt, ms){ if (grav !== g) return; clearTimeout(g.msgTimer); gravMensagem(txt); if (ms) g.msgTimer = setTimeout(()=>{ if (grav === g) gravMensagem(""); }, ms); }
+  function gravPararFaixas(g){ try{ if (g.stream) g.stream.getTracks().forEach(t => { t.onended = null; t.stop(); }); }catch(e){} }
+  function gravBytesTotal(g, agora){
+    const p = g.atual; let atual = 0;
+    if (p){ const s = p.inicio ? Math.max(0, (agora || Date.now()) - p.inicio) / 1000 : 0; atual = p.bytes || s * GRAV_BYTES_S; } // sem dados ainda: estima pelo tamanho padrão
+    return g.bytesFechados + atual;
+  }
+  // espaço que sobra agora = o que o navegador disse na última medida, menos o que foi gravado desde então e ainda não
+  // estava contado (a parte na memória só entra no "usado" depois de salva)
+  function gravFolga(g, totalBytes){ return g.folga == null ? null : g.folga - (totalBytes - g.salvosNaMedida); }
+  async function gravMedirEspaco(g){
+    try{
+      if (!navigator.storage || !navigator.storage.estimate) return;
+      const est = await navigator.storage.estimate(); if (!est || !est.quota) return;
+      g.folga = est.quota - (est.usage || 0); g.salvosNaMedida = g.bytesSalvos;
+    }catch(e){}
+  }
+  function gravPintar(g, b){
+    if (grav !== g) return;
+    const est = g.estado, gravando = est === "gravando", agora = Date.now();
+    gravEl("gravEstado").textContent = { abrindo: "ABRINDO…", pronto: "PRONTO", iniciando: "INICIANDO…", gravando: "● GRAVANDO", encerrando: "SALVANDO…", erro: "SEM CÂMERA" }[est] || "";
+    gravEl("gravEstado").classList.toggle("rec", gravando);
+    gravEl("gravTempo").textContent = gravDuracao(gravando && g.t0 ? (agora - g.t0) / 1000 : 0);
+    gravEl("gravParte").textContent = (gravando && g.atual) ? "Parte " + g.atual.n : "";
+    const botao = gravEl("gravBotao");
+    botao.disabled = !(est === "pronto" || gravando);
+    botao.classList.toggle("gravando", gravando);
+    botao.setAttribute("aria-label", gravando ? "Parar e salvar" : "Começar a gravar");
+    gravEl("gravCancelar").hidden = !(est === "abrindo" || est === "pronto" || est === "erro");
+    const barra = gravEl("gravBarra"), preench = gravEl("gravBarraPreench");
+    const fracao = (gravando && b) ? b.fracao : 0;
+    preench.style.width = Math.round(fracao * 100) + "%"; barra.setAttribute("aria-valuenow", String(Math.round(fracao * 100)));
+    // verde = limite é o fim da parte (a próxima começa sozinha); amarelo = o limite é o espaço; vermelho = o espaço acaba em 1 min
+    barra.classList.toggle("espaco", !!(gravando && b && b.porEspaco)); barra.classList.toggle("acaba", !!(gravando && b && b.porEspaco && b.falta <= 60));
+    const faltaEl = gravEl("gravFalta"), espEl = gravEl("gravEspaco");
+    if (gravando && b){
+      faltaEl.textContent = b.porEspaco ? "Só cabe mais " + gravDuracao(b.falta) + " no celular — depois a gravação para" : "Faltam " + gravDuracao(b.falta) + " para fechar esta parte — a próxima começa sozinha";
+      const folga = gravFolga(g, gravBytesTotal(g, agora));
+      espEl.textContent = folga == null ? "Não consegui medir o espaço deste celular: vale só o limite de 5 min por parte"
+        : "Cabe ainda ~" + gravCabe(Math.max(0, folga - RESERVA_ESPACO) / Math.max(GRAV_BYTES_S, g.bytesPorS || 0)) + " de vídeo neste celular" + (g.salvas ? " · " + g.salvas + (g.salvas === 1 ? " parte salva" : " partes salvas") : "");
+    } else if (est === "pronto"){
+      faltaEl.textContent = "Cada parte tem até " + gravCabe(PARTE_MS / 1000) + " — a próxima começa sozinha, sem você parar";
+      const folga = g.folga;
+      espEl.textContent = folga == null ? "Não consegui medir o espaço deste celular" : "Cabe ~" + gravCabe(Math.max(0, folga - RESERVA_ESPACO) / GRAV_BYTES_S) + " de vídeo neste celular";
+    } else { faltaEl.textContent = ""; espEl.textContent = ""; }
+  }
+  // câmera de trás, 720p; se o celular recusar o pedido exato, tenta sem exigência; sem microfone, segue sem som (e avisa)
+  async function gravPegarCamera(g){
+    const video = { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+    const gum = (c) => navigator.mediaDevices.getUserMedia(c);
+    try{ return await gum({ video, audio: true }); }
+    catch(e){
+      const n = e && e.name;
+      if (n === "OverconstrainedError" || n === "ConstraintNotSatisfiedError" || n === "TypeError"){ return await gum({ video: true, audio: true }); }
+      if (n === "NotFoundError" || n === "DevicesNotFoundError"){ const s = await gum({ video, audio: false }); g.semSom = true; return s; } // sem microfone (ou sem câmera: aí esta chamada também falha)
+      throw e;
+    }
+  }
+  async function gravAbrir(alvo){
+    if (grav || !alvo) return;
+    const g = grav = { estado: "abrindo", alvo, quem: gravEl("quemSelect").value, mime: gravFormato(), stream: null, semSom: false, partes: 0, atual: null, virandoP: null,
+      t0: 0, bytesFechados: 0, bytesSalvos: 0, salvosNaMedida: 0, folga: null, bytesPorS: 0, salvas: 0, msSalvos: 0, falhas: [], curtas: 0, filtroMudou: false, registro: [],
+      fila: Promise.resolve(), timer: 0, timerEspaco: 0, msgTimer: 0, wake: null, motivo: "" };
+    document.body.classList.add("gravando");
+    gravEl("telaGravacao").classList.add("aberta");
+    gravEl("gravNativa").hidden = true;
+    gravAviso(g, "Abrindo a câmera… se o celular perguntar, toque em Permitir.");
+    gravPintar(g);
+    let stream;
+    try{ stream = await gravPegarCamera(g); }
+    catch(e){
+      if (grav !== g) return;
+      console.warn("câmera do app:", e);
+      const n = e && e.name;
+      if (n === "NotFoundError" || n === "DevicesNotFoundError"){ gravFechar(g); pendente = alvo; gravEl("inputVideoCam").click(); return; } // sem câmera para o app: o caminho de sempre
+      g.estado = "erro"; gravPintar(g); gravEl("gravNativa").hidden = false;
+      gravAviso(g, (n === "NotAllowedError" || n === "SecurityError")
+        ? "O celular não deixou o app usar a câmera. Para liberar: nas permissões do site (cadeado ao lado do endereço), Câmera e Microfone → Permitir. No iPhone: Ajustes → Safari → Câmera.\n\nEnquanto isso, toque em \"Usar a câmera do celular\"."
+        : "Não consegui abrir a câmera pelo app (" + String((e && (e.name || e.message)) || e).slice(0, 80) + ").\n\nToque em \"Usar a câmera do celular\".");
+      return;
+    }
+    if (grav !== g){ try{ stream.getTracks().forEach(t => t.stop()); }catch(e){} return; }
+    g.stream = stream;
+    const previa = gravEl("gravPrevia"); previa.srcObject = stream; previa.play().catch(()=>{});
+    stream.getTracks().forEach(t => { t.onended = () => gravFaixaCaiu(g); });
+    try{ if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request("screen").then(w => { if (grav === g) g.wake = w; else w.release().catch(()=>{}); }, ()=>{}); }catch(e){} // tela acesa enquanto grava
+    await gravMedirEspaco(g);
+    if (grav !== g) return;
+    g.estado = "pronto";
+    gravAviso(g, g.semSom ? "Este celular não deu o microfone ao app: o vídeo vai ficar SEM SOM." : ((compactandoAgora || filaCompact.length) ? "Tem vídeo esperando compactação: ele só continua depois que você parar de gravar." : ""));
+    gravPintar(g);
+  }
+  function gravFaixaCaiu(g){
+    if (grav !== g) return;
+    if (g.estado === "gravando") gravParar(g, "camera");
+    else if (g.estado === "pronto" || g.estado === "abrindo" || g.estado === "iniciando"){
+      g.estado = "erro"; gravPintar(g); gravEl("gravNativa").hidden = false;
+      gravAviso(g, "A câmera foi desligada (outro app a usou, ou o celular a cortou). Cancele e abra de novo, ou use a câmera do celular.");
+    }
+  }
+  function gravNovaParte(g){
+    const opcoes = { videoBitsPerSecond: GRAV_VIDEO_BPS, audioBitsPerSecond: GRAV_AUDIO_BPS };
+    if (g.mime) opcoes.mimeType = g.mime;
+    const rec = new MediaRecorder(g.stream, opcoes); // pode lançar: quem chama trata
+    const parte = { n: g.partes + 1, chunks: [], bytes: 0, inicio: 0, mime: g.mime, rec };
+    rec.ondataavailable = (e) => { if (e.data && e.data.size){ parte.chunks.push(e.data); parte.bytes += e.data.size; } };
+    g.partes = parte.n;
+    return parte;
+  }
+  // liga o gravador e só resolve quando ele de fato começou (onstart); 3 s sem começar = falha
+  function gravLigar(g, parte){
+    return new Promise((resolve, reject) => {
+      const rec = parte.rec; let ligou = false;
+      const t = setTimeout(()=>{ if (!ligou) reject(new Error("o gravador não começou")); }, 3000);
+      rec.onstart = () => { ligou = true; clearTimeout(t); parte.inicio = Date.now(); resolve(); };
+      rec.onerror = (e) => { if (!ligou){ clearTimeout(t); reject((e && e.error) || new Error("erro no gravador")); } else if (grav === g && g.estado === "gravando") gravParar(g, "erro"); };
+      try{ rec.start(1000); }catch(err){ clearTimeout(t); reject(err); } // um pedaço por segundo: a parte vai crescendo na memória e o tamanho é conhecido
+    });
+  }
+  // para o gravador da parte e devolve { parte, blob, ms, tipo }; "stop" que nunca chega em 5 s = usa o que veio
+  function gravFecharParte(g, parte){
+    return new Promise((resolve) => {
+      const rec = parte.rec; let feito = false, t = 0;
+      const fim = () => {
+        if (feito) return; feito = true; clearTimeout(t);
+        const tipo = String(rec.mimeType || parte.mime || "video/webm").split(";")[0];
+        const blob = new Blob(parte.chunks, { type: tipo }); parte.chunks = [];
+        g.bytesFechados += blob.size;
+        const ms = parte.inicio ? Date.now() - parte.inicio : 0;
+        g.registro.push({ n: parte.n, ms, bytes: blob.size });
+        resolve({ parte, blob, ms, tipo });
+      };
+      t = setTimeout(fim, 5000);
+      rec.onstop = fim;
+      try{ if (rec.state !== "inactive") rec.stop(); else fim(); }catch(e){ fim(); }
+    });
+  }
+  async function gravVirarParte(g){
+    const velha = g.atual; let nova = null;
+    try{ nova = gravNovaParte(g); await gravLigar(g, nova); g.atual = nova; } // liga o novo ANTES de parar o velho: nenhum quadro some entre as partes
+    catch(e){ console.warn("não consegui ligar o gravador novo antes de parar o velho:", e); try{ if (nova && nova.rec.state !== "inactive") nova.rec.stop(); }catch(e2){} nova = null; }
+    const f = await gravFecharParte(g, velha);
+    if (!nova){ // sem sobrepor: corte pequeno entre as partes
+      if (grav !== g || g.estado !== "gravando"){ gravEntregar(g, f); return; }
+      try{ nova = gravNovaParte(g); await gravLigar(g, nova); g.atual = nova; }
+      catch(e){ console.error(e); gravEntregar(g, f); if (grav === g && g.estado === "gravando") gravParar(g, "erro"); return; }
+    }
+    gravEntregar(g, f);
+  }
+  // cada parte fechada entra no ponto pelo MESMO caminho de uma foto (adicionarUmArquivo), uma de cada vez e sem redesenhar
+  // a tela por trás (lote: a tela só é refeita no fim). A primeira parte salva faz o "refazer" se foi isso que a pessoa pediu;
+  // as outras entram como vídeos novos no mesmo ponto. Falha que não adianta repetir (sem espaço, ponto apagado) para a gravação.
+  function gravEntregar(g, f){
+    if (!f || !f.blob || !f.blob.size) return;
+    if (f.ms < 1000){ g.curtas++; return; } // sobra de uma virada ou toque duplo: sem imagem que valha guardar
+    g.fila = g.fila.then(async () => {
+      const file = new File([f.blob], "video-parte" + f.parte.n + (f.tipo.includes("mp4") ? ".mp4" : ".webm"), { type: f.tipo, lastModified: Date.now() });
+      file.parteN = f.parte.n;
+      const alvo = g.salvas === 0 ? g.alvo : { ambienteId: g.alvo.ambienteId, paredeId: g.alvo.paredeId, replaceId: null };
+      let r;
+      try{ r = await adicionarUmArquivo(file, alvo, { quem: g.quem, origem: "camera", lote: true, jaCompacto: true }); }
+      catch(err){ console.error(err); r = { ok: false, parar: true, motivo: "erro" }; }
+      if (r.ok){ g.salvas++; g.bytesSalvos += f.blob.size; g.msSalvos += f.ms; if (r.filtroMudou) g.filtroMudou = true; gravAviso(g, "Parte " + f.parte.n + " salva ✓", 3500); }
+      else { g.falhas.push({ n: f.parte.n, motivo: r.motivo }); if (r.parar && g.estado === "gravando") gravParar(g, "falha"); }
+    });
+  }
+  function gravTick(g){
+    if (grav !== g || g.estado !== "gravando" || !g.atual) return;
+    const agora = Date.now(), p = g.atual, decorrido = Math.max(0, agora - p.inicio);
+    if (decorrido >= PARTE_MS && !g.virandoP) g.virandoP = gravVirarParte(g).catch(e => console.error(e)).then(()=>{ g.virandoP = null; });
+    const total = gravBytesTotal(g, agora), totalS = (agora - g.t0) / 1000;
+    g.bytesPorS = totalS > 10 ? total / totalS : 0; // ritmo real (movimento forte enche mais que o padrão): vale o maior dos dois
+    const b = gravCalcularBarra(decorrido / 1000, PARTE_MS / 1000, gravFolga(g, total), Math.max(GRAV_BYTES_S, g.bytesPorS), RESERVA_ESPACO);
+    if (b.porEspaco && b.falta <= 0){ gravParar(g, "espaco"); return; }
+    gravPintar(g, b);
+  }
+  async function gravComecar(){
+    const g = grav; if (!g || g.estado !== "pronto") return;
+    g.estado = "iniciando"; gravPintar(g);
+    await gravMedirEspaco(g);
+    if (grav !== g) return;
+    if (g.folga != null && g.folga - RESERVA_ESPACO < GRAV_BYTES_S * 60){
+      g.estado = "pronto"; gravPintar(g);
+      gravAviso(g, "O celular está com pouco espaço: não cabe nem 1 minuto de vídeo. Libere espaço (apague vídeos antigos que não precisa ou exporte um backup) e tente de novo.");
+      return;
+    }
+    try{ g.atual = gravNovaParte(g); await gravLigar(g, g.atual); }
+    catch(e){
+      console.error(e);
+      if (grav !== g) return;
+      g.atual = null; g.estado = "erro"; gravPintar(g); gravEl("gravNativa").hidden = false;
+      gravAviso(g, "O gravador do celular não começou (" + String((e && (e.name || e.message)) || e).slice(0, 80) + ").\n\nToque em \"Usar a câmera do celular\".");
+      return;
+    }
+    if (grav !== g){ try{ g.atual.rec.stop(); }catch(e){} return; } // fechou a tela no meio: nada a guardar
+    g.t0 = g.atual.inicio; g.estado = "gravando"; pendente = null;
+    window.addEventListener("beforeunload", gravSegurarSaida);
+    g.timer = setInterval(()=>gravTick(g), 250);
+    g.timerEspaco = setInterval(()=>gravMedirEspaco(g), 5000);
+    gravAviso(g, ""); gravTick(g);
+  }
+  async function gravParar(g, motivo){
+    if (grav !== g || g.estado === "encerrando") return;
+    const gravou = g.estado === "gravando";
+    g.estado = "encerrando"; g.motivo = motivo;
+    clearInterval(g.timer); clearInterval(g.timerEspaco);
+    gravPintar(g);
+    gravAviso(g, "Salvando o vídeo…");
+    try{ if (g.virandoP) await g.virandoP; }catch(e){}
+    if (gravou && g.atual){ try{ gravEntregar(g, await gravFecharParte(g, g.atual)); }catch(e){ console.error(e); } }
+    gravPararFaixas(g); // câmera desligada assim que a última parte fecha
+    try{ await g.fila; }catch(e){ console.error(e); }
+    const salvas = g.salvas, dur = gravDuracao(g.msSalvos / 1000), falhas = g.falhas.slice();
+    gravFechar(g);
+    renderProgresso(); renderAmbientes(); // UMA vez, no fim
+    if (salvas) avisarEspaco();
+    const guardado = salvas ? "O que já tinha sido gravado foi salvo (" + (salvas === 1 ? "1 parte" : salvas + " partes") + ", " + dur + ")." : "Nada ficou salvo.";
+    if (!falhas.length && salvas) toast("Vídeo salvo · " + (salvas === 1 ? "" : salvas + " partes · ") + dur + (g.filtroMudou ? " · filtro voltou pra 'todas'" : "") + (copiaLigada() ? " · cópia no Download" : ""));
+    else if (!falhas.length && g.curtas) toast("Gravação curta demais: não salvei");
+    if (falhas.length){
+      await avisar("Parte do vídeo não entrou", falhas.map(x => "Parte " + x.n + ": " + porqueParou(x.motivo) + ".").join("\n") + "\n\n" + guardado
+        + (copiaLigada() ? " A cópia de cada parte foi mandada para a pasta Download do celular — confira lá." : " Com a cópia no celular desligada, a parte que não entrou se perdeu.")
+        + " " + ((falhas[0].motivo === "gravar" || falhas[0].motivo === "espaco") ? "Libere espaço (apague vídeos antigos que não precisa ou exporte um backup) antes de gravar de novo."
+          : falhas[0].motivo === "ponto" ? "Escolha outro ponto e grave de novo." : "Tente gravar de novo."));
+    } else if (motivo === "espaco"){
+      await avisar("Parei: o celular está sem espaço", guardado + " Libere espaço (apague vídeos antigos que não precisa ou exporte um backup) antes de gravar de novo.");
+    } else if (motivo === "saiu"){
+      await avisar("Gravação encerrada", "Você saiu do app, e o celular desliga a câmera quando isso acontece. " + guardado);
+    } else if (motivo === "camera"){
+      await avisar("A câmera foi desligada", "Outro app usou a câmera, ou o celular a desligou. " + guardado);
+    } else if (motivo === "erro"){
+      await avisar("A gravação parou", "O gravador do celular deu erro. " + guardado);
+    }
+  }
+  function gravFechar(g){
+    if (grav !== g) return;
+    clearInterval(g.timer); clearInterval(g.timerEspaco); clearTimeout(g.msgTimer);
+    window.removeEventListener("beforeunload", gravSegurarSaida);
+    gravPararFaixas(g);
+    try{ gravEl("gravPrevia").srcObject = null; }catch(e){}
+    try{ if (g.wake) g.wake.release().catch(()=>{}); }catch(e){}
+    gravEl("telaGravacao").classList.remove("aberta");
+    document.body.classList.remove("gravando");
+    gravMensagem("");
+    grav = null;
+  }
+  gravEl("gravBotao").addEventListener("click", ()=>{ const g = grav; if (!g) return; if (g.estado === "pronto") gravComecar(); else if (g.estado === "gravando") gravParar(g, "usuario"); });
+  gravEl("gravCancelar").addEventListener("click", ()=>{ const g = grav; if (!g || !(g.estado === "abrindo" || g.estado === "pronto" || g.estado === "erro")) return; pendente = null; gravFechar(g); });
+  gravEl("gravNativa").addEventListener("click", ()=>{ const g = grav; if (!g || g.estado === "gravando" || g.estado === "encerrando") return; const alvo = g.alvo; gravFechar(g); pendente = alvo; gravEl("inputVideoCam").click(); });
+  // saiu do app (trocou de app, bloqueou a tela): o celular desliga a câmera. Gravando → fecha e salva a parte que existe;
+  // só olhando a prévia → fecha a tela
+  document.addEventListener("visibilitychange", ()=>{
+    const g = grav; if (!g || !document.hidden) return;
+    if (g.estado === "gravando") gravParar(g, "saiu");
+    else if (g.estado !== "encerrando"){ pendente = null; gravFechar(g); }
+  });
+
   async function aoEscolherArquivo(e){
     const arquivos = Array.from(e.target.files || []); // copia ANTES de limpar o campo: a lista do campo é viva e esvazia junto
     const origem = e.target.id === "inputFoto" ? "galeria" : "camera";
@@ -2737,7 +3081,7 @@
     // No lote, quem chamou já a começou dentro do toque para o primeiro vídeo e a entrega em ctx.legado.
     // Se o fluxo abortar antes de agendar, o token cancela a rota antiga (senão ela rodaria até o fim com a faixa presa).
     const tokenLegado = ctx.legado ? ctx.legado.token : { cancelado: false };
-    const promessaLegada = ctx.legado ? ctx.legado.promessa : ((ehVideo && !VIDEO_RAPIDO_OK && !lote) ? comprimirVideo(file, (p)=>mostrarProgressoVideo(p, 0, true), tokenLegado) : null);
+    const promessaLegada = ctx.legado ? ctx.legado.promessa : ((ehVideo && !VIDEO_RAPIDO_OK && !lote && !ctx.jaCompacto) ? comprimirVideo(file, (p)=>mostrarProgressoVideo(p, 0, true), tokenLegado) : null);
     let agendado = false;
     const abortarLegado = ()=>{ if (promessaLegada && !agendado){ tokenLegado.cancelado = true; promessaLegada.then(()=>esconderProgressoVideo()); } };
     let abrindo = false; // true enquanto o navegador abre/reduz a foto: falhar AÍ é arquivo que ele não lê ou falta de memória, não de espaço
@@ -2764,12 +3108,13 @@
         antes = Object.assign({}, foto); fotoAlterada = foto; apagarDepois = alvo.replaceId;
         marcarRemovido(alvo.replaceId);
         foto.id = novoId; foto.ts = Date.now(); foto.quem = quem; foto.tipo = ehVideo ? "video" : "foto";
-        foto.compactando = ehVideo; foto.tamanho = blob.size; delete foto.comprimido; foto.tentativas = 0;
+        foto.compactando = ehVideo && !ctx.jaCompacto; foto.tamanho = blob.size; delete foto.comprimido; foto.tentativas = 0;
+        if (ehVideo && ctx.jaCompacto) foto.comprimido = true; // parte gravada pela câmera do app: já nasce no tamanho final
         if (orig) foto.orig = orig; else delete foto.orig; // a foto agora é OUTRO arquivo
         if (!foto.etapa) foto.etapa = etapaParaNovaFotoEm(loc.emp, loc.andar); // foto antiga sem etapa ganha a atual ao ser refeita
         idGravado = novoId;
         avisoFiltro = garantirVisivel(foto);
-        msg = "Atualizado" + (ehVideo ? " · vídeo salvo, compactando em segundo plano" : "") + avisoFiltro;
+        msg = "Atualizado" + (ehVideo ? (ctx.jaCompacto ? " · vídeo salvo" : " · vídeo salvo, compactando em segundo plano") : "") + avisoFiltro;
       } else {
         const id = novoIdFoto(quem);
         await idbPut(id, blob);
@@ -2777,12 +3122,13 @@
         if (!loc){ await idbDelete(id); if (!lote) toast("Esse ambiente mudou — abre de novo e tenta outra vez"); abortarLegado(); return { ok: false, parar: true, motivo: "ponto" }; }
         // outra aba (ou outro lote) pôs o mesmo arquivo neste ponto enquanto este gravava
         if (chave && pontoTemArquivo(loc.parede, chave)){ await idbDelete(id); abortarLegado(); return { ok: false, parar: false, motivo: "repetida" }; }
-        const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFotoEm(loc.emp, loc.andar), compactando: ehVideo, tamanho: blob.size };
+        const novaFoto = { id, ts: Date.now(), quem, nota:"", tipo: ehVideo ? "video" : "foto", etapa: etapaParaNovaFotoEm(loc.emp, loc.andar), compactando: ehVideo && !ctx.jaCompacto, tamanho: blob.size };
+        if (ehVideo && ctx.jaCompacto) novaFoto.comprimido = true; // parte gravada pela câmera do app: já nasce no tamanho final
         if (orig) novaFoto.orig = orig;
         loc.parede.fotos.push(novaFoto);
         idGravado = id;
         avisoFiltro = garantirVisivel(novaFoto);
-        msg = (ehVideo ? "Vídeo salvo · compactando em segundo plano" : "Foto adicionada") + " · " + novaFoto.etapa + avisoFiltro;
+        msg = (ehVideo ? (ctx.jaCompacto ? "Vídeo salvo" : "Vídeo salvo · compactando em segundo plano") : "Foto adicionada") + " · " + novaFoto.etapa + avisoFiltro;
       }
       if (!salvarEstado()){
         if (fotoAlterada){
@@ -2802,7 +3148,7 @@
         renderProgresso(); renderAmbientes();
         avisarEspaco(); // o celular enche DURANTE o uso: reconfere depois de cada gravação, não só na abertura
       }
-      if (ehVideo && idGravado){ agendado = true; if (ctx.legado) ctx.legado.usado = true; agendarCompactacao(idGravado, file, promessaLegada); }
+      if (ehVideo && idGravado && !ctx.jaCompacto){ agendado = true; if (ctx.legado) ctx.legado.usado = true; agendarCompactacao(idGravado, file, promessaLegada); }
       return { ok: true, video: ehVideo, filtroMudou: !!avisoFiltro };
     } catch(err){
       console.error(err);
@@ -3196,7 +3542,10 @@
     // o ?v= do "Atualizar agora" já cumpriu o papel: sai da URL, senão toda recarga manual repete a mesma URL (e o cache dela)
     try{ if (/[?&]v=/.test(location.search)) history.replaceState(null, "", location.pathname); }catch(e){}
     document.getElementById("btnFecharAviso").addEventListener("click", ()=>{ document.getElementById("avisoVersao").style.display = "none"; });
-    function recarregarVersaoNova(){ try{ localStorage.setItem("obraFotosAtualizacaoTentada", String(Date.now())); }catch(e){} location.href = location.pathname + "?v=" + Date.now(); }
+    function recarregarVersaoNova(){
+      if (grav){ setTimeout(recarregarVersaoNova, 5000); return; } // gravando: recarregar agora perderia a parte em andamento
+      try{ localStorage.setItem("obraFotosAtualizacaoTentada", String(Date.now())); }catch(e){} location.href = location.pathname + "?v=" + Date.now();
+    }
     let atualizarAoTerminar = false;
     document.getElementById("btnRecarregar").addEventListener("click", async ()=>{
       // lote de fotos entrando: atualizar agora cortaria o lote no meio (as que faltam não entrariam) — espera ele acabar
@@ -3217,7 +3566,8 @@
   })();
   // gancho de teste (só no servidor local de desenvolvimento; não existe na versão publicada)
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__obraDebug = { setPendente:(p)=>{ pendente = p; }, comprimirVideoRapido, comprimirVideo, idbGet, idbTodasChaves, estado:()=>estado, acharFotoPorId, salvarEstado, fundirEstados, varrerOrfaos, LS_KEY, VIDEO_RAPIDO_OK,
-    setPrazoFoto:(ms)=>{ PRAZO_FOTO_MS = ms; }, setLimiteVideoGrande:(b)=>{ LIMITE_VIDEO_GRANDE = b; }, lotesEmAndamento:()=>andamentos.size, LS_LOTE };
+    setPrazoFoto:(ms)=>{ PRAZO_FOTO_MS = ms; }, setLimiteVideoGrande:(b)=>{ LIMITE_VIDEO_GRANDE = b; }, lotesEmAndamento:()=>andamentos.size, LS_LOTE,
+    setParteMs:(ms)=>{ PARTE_MS = ms; }, setReservaEspaco:(b)=>{ RESERVA_ESPACO = b; }, gravacao:()=>grav && { estado: grav.estado, partes: grav.partes, salvas: grav.salvas, falhas: grav.falhas.length, mime: grav.mime, registro: grav.registro.slice(), curtas: grav.curtas } };
 })();
 </script>
 </body>

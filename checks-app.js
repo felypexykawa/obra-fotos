@@ -53,6 +53,17 @@ const CAPACIDADES = {
   'localizarPonto': 'ponto procurado na árvore inteira (lote continua se trocar de andar)',
   'idbConexao': 'uma conexão do IndexedDB reaproveitada',
   'webkitGetAsEntry': 'pasta arrastada é ignorada com aviso próprio',
+  // v7.9: câmera do app com barra de tempo
+  'id="telaGravacao"': 'tela de gravação do app (câmera com barra de tempo)',
+  'id="gravBarra"': 'barra de tempo da gravação',
+  'gravCalcularBarra': 'barra: o que acabar primeiro entre o fim da parte e o espaço do celular',
+  'let PARTE_MS = 5 * 60 * 1000': 'partes de 5 minutos',
+  'gravVirarParte': 'troca de parte sozinha, sem parar de gravar',
+  'gravEntregar': 'cada parte fechada entra no ponto',
+  'jaCompacto': 'parte gravada já no tamanho final não passa pela fila de compactação',
+  'while (grav) await': 'fila de compactação espera a gravação acabar',
+  'id="gravNativa"': 'botão "Usar a câmera do celular" quando a câmera do app não abre',
+  'gravDisponivel': 'sem câmera pelo app, cai na câmera do celular',
 };
 for (const [k, v] of Object.entries(CAPACIDADES)) if (!s.includes(k)) falha('capacidade ausente: ' + k + ' (' + v + ')');
 
